@@ -83,6 +83,7 @@ sub gitresethard_formerge {
 }
 
 sub wc_l {
+	return 0 unless length $_[0];
 	1 + ($_[0] =~ tr/\n//)
 }
 
