@@ -48,8 +48,8 @@ sub gitresethard_formerge {
 	my $gitstatus = gitcapture("status", "-uno", "--porcelain", "-z");
 	for my $gitstatusline (split /\0/, $gitstatus) {
 		my ($status, $path) = ($gitstatusline =~ /^(..) (.*)$/);
-		chop $status if $status =~ /\s$/;
-		if ($status =~ /^[MDU]$/) {
+		$status =~ s/\s+//;
+		if ($status =~ /^([MDU])\g1?$/) {
 			git("checkout", "HEAD", $path);
 		} elsif ($status eq 'A') {
 			git("rm", "-f", $path);
