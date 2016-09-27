@@ -3,6 +3,8 @@
 use strict;
 use warnings;
 
+use IPC::Open2;
+
 # TODO: check that merges don't pull in extraneous junk [from master]
 # TODO: cherry-picked commits in rebasing branch
 # TODO: compare result of each merge
@@ -43,6 +45,23 @@ sub gitcapture {
 	$out
 }
 
+sub patchid {
+	my @cmd = makegitcmd("patch-id", "--stable");
+	my ($outio, $inio);
+	open2($outio, $inio, @cmd) or die;
+	print $inio shift;
+	close $inio;
+	my $out;
+	{
+		local $/;
+		$out = <$outio>;
+	}
+	close $outio;
+	chomp $out;
+	$out =~ s/\s.*$//;
+	$out
+}
+
 sub gitresethard_formerge {
 	# git reset --hard, but without clearing merge info
 	my $gitstatus = gitcapture("status", "-uno", "--porcelain", "-z");
@@ -73,6 +92,43 @@ sub userfix {
 	kill('STOP', $$);
 	
 	# SIGCONT resumes here
+}
+
+sub mymerger {
+	my ($merge_from) = @_;
+	my $merge_ec = gitmayfail("merge", "--no-commit", $merge_from);
+	my $diff = gitcapture("diff", "HEAD");
+	if (not $merge_ec) {
+		# Check if it was a no-op
+		my $difflines = wc_l($diff);
+		if (!$difflines) {
+			return "tree";
+		}
+		return "clean";
+	}
+	
+	my $conflict_id = patchid($diff);
+	
+	my $resbase = "assemble-knots-resolutions/$conflict_id";
+	if (-e "$resbase.diff") {
+		gitresethard_formerge();
+		git("apply", "--index", "--whitespace=nowarn", "$resbase.diff");
+		print("Conflict ID: $conflict_id AUTOPATCHING\n");
+		return "clean";
+	}
+	
+	if (-e "$resbase.res") {
+		open(my $resfh, "<", "$resbase.res");
+		my $res = <$resfh>;
+		close $resfh;
+		print("Conflict ID: $conflict_id AUTORESOLVING with $res\n");
+		return $res;
+	}
+	
+	gitmayfail("-p", "diff", "--color=always", "HEAD");
+	print("Conflict ID: $conflict_id\n");
+	
+	''
 }
 
 open(my $spec, '<', $specfn);
@@ -112,17 +168,12 @@ while (<$spec>) {
 		my $commitmsg = "Merge " . (($prnum > 0) ? "$prnum via " : "") . "$branchname";
 		my $is_tree_merge;
 		{
-			my $merge_ec = gitmayfail("merge", "--no-commit", $mainmerge);
-			my $diff = gitcapture("diff", "HEAD");
-			if (not $merge_ec) {
-				# Check if it was a no-op
-				my $difflines = wc_l($diff);
-				if (!$difflines) {
-					$is_tree_merge = 1;
-				}
+			my $res = mymerger($mainmerge);
+			if ($res eq 'tree') {
+				$is_tree_merge = 1;
+			} elsif ($res eq 'clean') {
+				# good, nothing to do here
 			} else {
-				print "$diff\n";
-				my $res = '';
 				while ($res !~ /^[123]$/) {
 					print "Conflict found: 1) Fix, 2) Abort, or 3) Tree-merge\n";
 					$res = <>;
@@ -146,14 +197,13 @@ while (<$spec>) {
 		}
 		git("commit", "-am", $commitmsg);
 		if ($merge_more) {
-			my $merge_ec = gitmayfail("merge", "--no-commit", $branchname);
-			my $diff = gitcapture("diff", "HEAD");
-			if (not $merge_ec) {
+			my $res = mymerger($branchname);
+			if ($res eq 'tree') {
 				# If it doesn't change anything, just skip it entirely
 				undef $merge_more;
+			} elsif ($res eq 'clean') {
+				# good, nothing to do here
 			} else {
-				print "$diff\n";
-				my $res = '';
 				while ($res !~ /^[123]$/) {
 					print "Conflict found: 1) Fix, 2) Abort, or 3) Ignore updates\n";
 					$res = <>;
