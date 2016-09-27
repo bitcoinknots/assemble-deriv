@@ -5,7 +5,6 @@ use warnings;
 
 use IPC::Open2;
 
-# TODO: check that merges don't pull in extraneous junk [from master]
 # TODO: cherry-picked commits in rebasing branch
 # TODO: compare result of each merge
 
@@ -131,6 +130,8 @@ sub mymerger {
 	''
 }
 
+my @poison;
+
 open(my $spec, '<', $specfn);
 while (<$spec>) {
 	s/\s*#.*//;  # remove comments
@@ -139,6 +140,11 @@ while (<$spec>) {
 	} elsif (m/^checkout (.*)$/) {
 		my $branchhead = gitcapture("rev-parse", $1);
 		git "checkout", $branchhead;
+		
+		@poison = ();
+		my $poisoncommit = gitcapture("log", "..master", "--first-parent", "--reverse", "--format=%H");
+		$poisoncommit =~ s/\n.*//s;
+		push @poison, $poisoncommit;
 	} elsif (m/^\@(.*)$/) {
 		#git "checkout", "-b", "NEW_$1";
 	} elsif (my ($prnum, $rem) = (m/^\t(\d+|\-|n\/a)\s+(.*)$/)) {
@@ -153,6 +159,12 @@ while (<$spec>) {
 		}
 		my $branchparent = $branchname;
 		my $mainmerge = $branchname;
+		
+		for my $poison (@poison) {
+			if (!gitmayfail("merge-base", "--is-ancestor", $poison, $branchname)) {
+				die "Branch $branchname is poisoned";
+			}
+		}
 		
 		my ($merge_lastapply, $merge_more);
 		if (defined $lastapply) {
