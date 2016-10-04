@@ -137,6 +137,11 @@ sub mymerger {
 	''
 }
 
+sub commitmsg {
+	my ($prnum, $branchname) = @_;
+	"Merge " . (($prnum > 0) ? "$prnum via " : "") . "$branchname"
+}
+
 my @poison;
 
 open(my $spec, '<', $specfn);
@@ -154,6 +159,11 @@ while (<$spec>) {
 		push @poison, $poisoncommit;
 	} elsif (m/^\@(.*)$/) {
 		#git "checkout", "-b", "NEW_$1";
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)?(?:\s+($hexd{7,}\b))?$/)) {
+		my $commitmsg = "NULL-" . commitmsg($prnum, $branchname);
+		my $tree = gitcapture("write-tree");
+		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $lastapply);
+		git("checkout", "-q", $chash);
 	} elsif (my ($prnum, $rem) = (m/^\t *($re_prnum)\s+(.*)$/)) {
 		$rem =~ m/($re_branch)?(?:\s+($hexd{7,}\b))?$/ or die;
 		my ($branchname, $lastapply) = ($1, $2);
@@ -184,7 +194,7 @@ while (<$spec>) {
 			}
 		}
 		
-		my $commitmsg = "Merge " . (($prnum > 0) ? "$prnum via " : "") . "$branchname";
+		my $commitmsg = commitmsg($prnum, $branchname);
 		my $is_tree_merge;
 		{
 			my $res = mymerger($mainmerge);
