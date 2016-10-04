@@ -152,7 +152,7 @@ while (<$spec>) {
 		push @poison, $poisoncommit;
 	} elsif (m/^\@(.*)$/) {
 		#git "checkout", "-b", "NEW_$1";
-	} elsif (my ($prnum, $rem) = (m/^\t(\d+|\-|n\/a)\s+(.*)$/)) {
+	} elsif (my ($prnum, $rem) = (m/^\t *(\d+|\-|n\/a)\s+(.*)$/)) {
 		$rem =~ m/(\S+)?(?:\s+($hexd{7,}\b))?$/ or die;
 		my ($branchname, $lastapply) = ($1, $2);
 		if (not defined $branchname) {
