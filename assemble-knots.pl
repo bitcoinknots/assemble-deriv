@@ -143,10 +143,17 @@ sub commitmsg {
 	"Merge " . (($prnum > 0) ? "$prnum via " : "") . "$branchname"
 }
 
+my %fetched_remotes;
+
 sub fetchforbranch {
 	my ($branchname) = @_;
 	if (my ($remote, $remote_ref) = ($branchname =~ m[^([^/]+)\/(.*)$])) {
+		if (exists $fetched_remotes{$remote}) {
+			print "Already fetched $remote earlier\n";
+			return
+		}
 		git "fetch", $remote;
+		$fetched_remotes{$remote} = undef;
 	}
 }
 
