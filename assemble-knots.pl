@@ -171,7 +171,7 @@ while (<$spec>) {
 		my $tree = gitcapture("write-tree");
 		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $lastapply);
 		git("checkout", "-q", $chash);
-	} elsif (my ($prnum, $rem) = (m/^\t *($re_prnum)\s+(.*)$/)) {
+	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
 		$rem =~ m/^(\S+)?(?:\s+($hexd{7,}\b)(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?)?$/ or die;
 		my ($branchname, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4);
 		if (not defined $branchname) {
@@ -202,9 +202,15 @@ while (<$spec>) {
 			$merge_lastapply = (wc_l(gitcapture("log", "--pretty=oneline", "..$lastapply", "^$branchname")) == 1);
 			die "Skipping a parent in rebase! Aborting" if $expect_to_rebase and not $merge_lastapply;
 			if ($merge_lastapply) {
-				# Regardless of whether the main branch has added commits or not, we want to start by merging the previous merge
-				$mainmerge = $lastapply;
-				$merge_more = wc_l(gitcapture("log", "--pretty=oneline", "$lastapply..$branchname")) > 0;
+				if ($flags =~ /m/) {
+					$merge_more = $lastapply;
+				} else {
+					# Regardless of whether the main branch has added commits or not, we want to start by merging the previous merge
+					$mainmerge = $lastapply;
+					if (wc_l(gitcapture("log", "--pretty=oneline", "$lastapply..$branchname")) > 0) {
+						$merge_more = $branchname;
+					}
+				}
 			}
 		}
 		
@@ -239,8 +245,8 @@ while (<$spec>) {
 			$commitmsg = "Tree-$commitmsg";
 		}
 		git("commit", "-am", $commitmsg);
-		if ($merge_more) {
-			my $res = mymerger($branchname);
+		if (defined $merge_more) {
+			my $res = mymerger($merge_more);
 			if ($res eq 'tree') {
 				# If it doesn't change anything, just skip it entirely
 				undef $merge_more;
@@ -259,13 +265,15 @@ while (<$spec>) {
 					undef $merge_more;
 				}
 			}
-			if ($merge_more) {
+			if (defined $merge_more) {
 				# TODO: Something to prevent failure due to in-progress merge?
 				git("commit", "-a", "--amend", "--no-edit");
 				undef $is_tree_merge;
 			} else {
 				git("reset", "--hard");
-				$branchparent = $lastapply . "^2";
+				if ($merge_more eq $branchname) {
+					$branchparent = $lastapply . "^2";
+				}
 			}
 		}
 		if ($merge_lastapply and not $is_tree_merge) {
