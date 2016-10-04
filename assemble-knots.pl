@@ -266,7 +266,7 @@ while (<$spec>) {
 				}
 			}
 			if (defined $merge_more) {
-				# TODO: Something to prevent failure due to in-progress merge?
+				unlink(".git/MERGE_HEAD") || die "Failed to remove MERGE_HEAD";
 				git("commit", "-a", "--amend", "--no-edit");
 				undef $is_tree_merge;
 			} else {
