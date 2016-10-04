@@ -13,6 +13,8 @@ my $expect_to_rebase = 1;
 my $specfn = shift;
 
 my $hexd = qr/[\da-f]/i;
+my $re_prnum = qr/\d+|\-|n\/a/;
+my $re_branch = qr/\S+/;
 
 if (not ($ENV{GIT_COMMITTER_DATE} and $ENV{GIT_AUTHOR_DATE})) {
 	die "Please set GIT_COMMITTER_DATE and GIT_AUTHOR_DATE\n";
@@ -152,8 +154,8 @@ while (<$spec>) {
 		push @poison, $poisoncommit;
 	} elsif (m/^\@(.*)$/) {
 		#git "checkout", "-b", "NEW_$1";
-	} elsif (my ($prnum, $rem) = (m/^\t *(\d+|\-|n\/a)\s+(.*)$/)) {
-		$rem =~ m/(\S+)?(?:\s+($hexd{7,}\b))?$/ or die;
+	} elsif (my ($prnum, $rem) = (m/^\t *($re_prnum)\s+(.*)$/)) {
+		$rem =~ m/($re_branch)?(?:\s+($hexd{7,}\b))?$/ or die;
 		my ($branchname, $lastapply) = ($1, $2);
 		if (not defined $branchname) {
 			die "No branch name?" if not $prnum;
