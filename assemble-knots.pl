@@ -14,6 +14,10 @@ my $specfn = shift;
 
 my $hexd = qr/[\da-f]/i;
 
+if (not ($ENV{GIT_COMMITTER_DATE} and $ENV{GIT_AUTHOR_DATE})) {
+	die "Please set GIT_COMMITTER_DATE and GIT_AUTHOR_DATE\n";
+}
+
 sub makegitcmd {
 	("git", "--no-pager", @_)
 }
