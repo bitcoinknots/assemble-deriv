@@ -142,6 +142,13 @@ sub commitmsg {
 	"Merge " . (($prnum > 0) ? "$prnum via " : "") . "$branchname"
 }
 
+sub fetchforbranch {
+	my ($branchname) = @_;
+	if (my ($remote, $remote_ref) = ($branchname =~ m[^([^/]+)\/(.*)$])) {
+		git "fetch", $remote;
+	}
+}
+
 my @poison;
 
 open(my $spec, '<', $specfn);
@@ -165,14 +172,21 @@ while (<$spec>) {
 		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $lastapply);
 		git("checkout", "-q", $chash);
 	} elsif (my ($prnum, $rem) = (m/^\t *($re_prnum)\s+(.*)$/)) {
-		$rem =~ m/($re_branch)?(?:\s+($hexd{7,}\b))?$/ or die;
-		my ($branchname, $lastapply) = ($1, $2);
+		$rem =~ m/^(\S+)?(?:\s+($hexd{7,}\b)(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?)?$/ or die;
+		my ($branchname, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4);
 		if (not defined $branchname) {
 			die "No branch name?" if not $prnum;
 			$branchname = "origin-pull/$prnum/head";
 		}
-		if (my ($remote, $remote_ref) = ($branchname =~ m[^([^/]+)\/(.*)$])) {
-			git "fetch", $remote;
+		fetchforbranch $branchname;
+		if (defined $lastupstream) {
+			if (not defined $upstreambranch) {
+				$upstreambranch = "origin-pull/$prnum/head";
+			}
+			fetchforbranch $upstreambranch;
+			if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
+				die "$prnum $branchname needs updates from upstream $upstreambranch\n";
+			}
 		}
 		my $branchparent = $branchname;
 		my $mainmerge = $branchname;
