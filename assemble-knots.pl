@@ -169,7 +169,7 @@ while (<$spec>) {
 		
 		my ($merge_lastapply, $merge_more);
 		if (defined $lastapply) {
-			$merge_lastapply = (wc_l(gitcapture("log", "--pretty=oneline", "--first-parent", "..$lastapply")) == 1);
+			$merge_lastapply = (wc_l(gitcapture("log", "--pretty=oneline", "..$lastapply", "^$branchname")) == 1);
 			die "Skipping a parent in rebase! Aborting" if $expect_to_rebase and not $merge_lastapply;
 			if ($merge_lastapply) {
 				# Regardless of whether the main branch has added commits or not, we want to start by merging the previous merge
