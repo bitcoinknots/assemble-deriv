@@ -191,7 +191,7 @@ while (<$spec>) {
 		git("checkout", "-q", $chash);
 	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
 		ensure_ready;
-		$rem =~ m/^(\S+)?(?:\s+($hexd{7,}\b)(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?)?$/ or die;
+		$rem =~ m/^(\S+)?(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?$/ or die;
 		my ($branchname, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4);
 		if (not defined $branchname) {
 			die "No branch name?" if not $prnum;
