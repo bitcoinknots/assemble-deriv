@@ -17,10 +17,6 @@ my $hexd = qr/[\da-f]/i;
 my $re_prnum = qr/\d+|\-|n\/a/;
 my $re_branch = qr/\S+/;
 
-if (not ($ENV{GIT_COMMITTER_DATE} and $ENV{GIT_AUTHOR_DATE})) {
-	die "Please set GIT_COMMITTER_DATE and GIT_AUTHOR_DATE\n";
-}
-
 sub makegitcmd {
 	("git", "--no-pager", @_)
 }
@@ -158,12 +154,23 @@ sub fetchforbranch {
 }
 
 my @poison;
+my %todo = map { $_=>undef } qw(checkout timestamp);
+
+sub ensure_ready {
+	return unless %todo;
+	die("Need to: " . join(", ", keys(%todo)));
+}
 
 open(my $spec, '<', $specfn);
 while (<$spec>) {
 	s/\s*#.*//;  # remove comments
 	if (m/^\s*$/) {
 		# blank line, skip
+	} elsif (my ($ts) = (m/^timestamp (.*)$/)) {
+		$ENV{GIT_COMMITTER_DATE} = $ts;
+		$ENV{GIT_AUTHOR_DATE} = $ts;
+		
+		delete $todo{timestamp};
 	} elsif (m/^checkout (.*)$/) {
 		my $branchhead = gitcapture("rev-parse", $1);
 		git "checkout", $branchhead;
@@ -172,14 +179,18 @@ while (<$spec>) {
 		my $poisoncommit = gitcapture("log", "..master", "--first-parent", "--reverse", "--format=%H");
 		$poisoncommit =~ s/\n.*//s;
 		push @poison, $poisoncommit;
+		
+		delete $todo{checkout};
 	} elsif (m/^\@(.*)$/) {
 		#git "checkout", "-b", "NEW_$1";
 	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)?(?:\s+($hexd{7,}\b))?$/)) {
+		ensure_ready;
 		my $commitmsg = "NULL-" . commitmsg($prnum, $branchname);
 		my $tree = gitcapture("write-tree");
 		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $lastapply);
 		git("checkout", "-q", $chash);
 	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
+		ensure_ready;
 		$rem =~ m/^(\S+)?(?:\s+($hexd{7,}\b)(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?)?$/ or die;
 		my ($branchname, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4);
 		if (not defined $branchname) {
