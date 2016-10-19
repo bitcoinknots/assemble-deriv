@@ -99,6 +99,9 @@ sub userfix {
 
 sub mymerger {
 	my ($merge_from) = @_;
+	my $ignore_autopatch;
+	my $difffile;
+retry:
 	my $merge_ec = gitmayfail("merge", "--no-commit", $merge_from);
 	my $diff = gitcapture("diff", "HEAD");
 	if (not $merge_ec) {
@@ -113,10 +116,21 @@ sub mymerger {
 	my $conflict_id = patchid($diff);
 	
 	my $resbase = "assemble-knots-resolutions/$conflict_id";
-	if (-e "$resbase.diff") {
+	if (-e "$resbase.diff" and not $ignore_autopatch) {
 		gitresethard_formerge();
-		git("apply", "--index", "--whitespace=nowarn", "$resbase.diff");
-		print("Conflict ID: $conflict_id AUTOPATCHING\n");
+		my $diffno = 0;
+		$difffile = "$resbase.diff";
+		while (gitmayfail("apply", "--index", "--whitespace=nowarn", $difffile) != 0) {
+			print("Conflict ID: $conflict_id AUTOPATCHING: ${difffile} FAILED!\n");
+			$difffile = "${resbase}-" . (++$diffno) . ".diff";
+			if (not -e "$difffile") {
+				print("(no more autopatches to try)\n");
+				git("reset", "--hard");
+				$ignore_autopatch = 1;
+				goto retry;
+			}
+		}
+		print("Conflict ID: $conflict_id AUTOPATCHED with $difffile\n");
 		return "clean";
 	}
 	
@@ -129,7 +143,7 @@ sub mymerger {
 	}
 	
 	gitmayfail("-p", "diff", "--color=always", "HEAD");
-	print("Conflict ID: $conflict_id\n");
+	print("Conflict ID: $conflict_id (use $difffile)\n");
 	
 	''
 }
