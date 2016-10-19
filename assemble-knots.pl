@@ -148,6 +148,35 @@ retry:
 	''
 }
 
+sub patchversion {
+	my ($verstr) = @_;
+	my $verfile = "src/clientversion.cpp";
+	my $tempfile = "src/clientversion.cpp.new";
+	open my $fin, "<", $verfile or die "Cannot open $verfile";
+	open my $fout, ">", $tempfile or die "Cannot open $tempfile";
+	my ($bno, $found);
+	while (my $fline = <$fin>) {
+		if ($bno) {
+			if ($fline =~ s/(\bss\s*\<\<\s*\")\w+\:\S+(\/\"\;)/$1$verstr$2/) {
+				warn "(replaced version string)";
+				undef $bno;
+				$found = 1;
+			}
+		} elsif ($fline =~ /\bif\s*\(\!fBaseNameOnly\)$/) {
+			$bno = 1;
+			warn "(found fBaseNameOnly check)";
+		}
+		print $fout $fline or die;
+	}
+	close $fout;
+	close $fin;
+	if (not $found) {
+		unlink($tempfile);
+		die "Failed to patch $verfile";
+	}
+	rename($tempfile, $verfile) or die;
+}
+
 sub commitmsg {
 	my ($prnum, $branchname) = @_;
 	"Merge " . (($prnum > 0) ? "$prnum via " : "") . "$branchname"
@@ -197,6 +226,18 @@ while (<$spec>) {
 		delete $todo{checkout};
 	} elsif (m/^\@(.*)$/) {
 		#git "checkout", "-b", "NEW_$1";
+	} elsif (my ($verstr, $lastapply) = (m/^\t *n\/a\s+\(bump\_version\=([^)]+)\)(?:\s+($hexd{7,}))?$/)) {
+		ensure_ready;
+		
+		if (defined $lastapply) {
+			if (wc_l(gitcapture("log", "--pretty=oneline", "..$lastapply")) != 1) {
+				die "Skipping a parent in rebase! Aborting"
+			}
+			git("merge", "--no-commit", $lastapply);
+		}
+		
+		patchversion($verstr);
+		git("commit", "-am", "Bump version to $verstr");
 	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)?(?:\s+($hexd{7,}\b))?$/)) {
 		ensure_ready;
 		my $commitmsg = "NULL-" . commitmsg($prnum, $branchname);
