@@ -283,6 +283,13 @@ while (<$spec>) {
 		my $tree = gitcapture("write-tree");
 		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $revert_commit);
 		git("checkout", "-q", $chash);
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *(\d+|\-|n\/a)\s+(\S+)?\s+($hexd{7,})$/)) {
+		ensure_ready;
+		
+		my $commitmsg = "Tree-" . commitmsg($prnum, $branchname);
+		my $tree = gitcapture("write-tree");
+		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $lastapply);
+		git("checkout", "-q", $chash);
 	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
 		ensure_ready;
 		$rem =~ m/^(\S+)?(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?$/ or die;
