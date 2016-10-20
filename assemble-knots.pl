@@ -238,6 +238,22 @@ while (<$spec>) {
 		
 		patchversion($verstr);
 		git("commit", "-am", "Bump version to $verstr");
+	} elsif (my ($cherry, $lastapply) = (m/^\t *n\/a\s+\(cherrypick\=($hexd{7,})\)(?:\s+($hexd{7,}))?$/)) {
+		ensure_ready;
+		
+		git("cherry-pick", "--no-commit", $cherry);
+		
+		if (defined $lastapply) {
+			if (wc_l(gitcapture("log", "--pretty=oneline", "..$lastapply")) != 1) {
+				die "Skipping a parent in rebase! Aborting"
+			}
+			$lastapply = gitcapture("rev-parse", $lastapply);
+			open my $MERGE_HEAD, ">", ".git/MERGE_HEAD";
+			print $MERGE_HEAD $lastapply;
+			close $MERGE_HEAD;
+		}
+		
+		git("commit", "-aC", $cherry);
 	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)?(?:\s+($hexd{7,}\b))?$/)) {
 		ensure_ready;
 		my $commitmsg = "NULL-" . commitmsg($prnum, $branchname);
