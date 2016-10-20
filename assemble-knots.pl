@@ -17,6 +17,15 @@ my $hexd = qr/[\da-f]/i;
 my $re_prnum = qr/\d+|\-|n\/a/;
 my $re_branch = qr/\S+/;
 
+sub slurpfile {
+	my ($fn) = @_;
+	open my $fh, "<", $fn or die;
+	local $/;
+	my $r = <$fh>;
+	close $fh;
+	$r
+}
+
 sub makegitcmd {
 	("git", "--no-pager", @_)
 }
@@ -116,6 +125,7 @@ retry:
 	my $conflict_id = patchid($diff);
 	
 	my $resbase = "assemble-knots-resolutions/$conflict_id";
+	$difffile = "$resbase.diff" unless defined $difffile;
 	if (-e "$resbase.diff" and not $ignore_autopatch) {
 		gitresethard_formerge();
 		my $diffno = 0;
@@ -254,11 +264,24 @@ while (<$spec>) {
 		}
 		
 		git("commit", "-aC", $cherry);
-	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)?(?:\s+($hexd{7,}\b))?$/)) {
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)?\s+($hexd{7,})$/)) {
 		ensure_ready;
+		
+		my $current_head_commit = gitcapture("rev-parse", "HEAD");
+		my $current_head_ref = slurpfile(".git/HEAD");
+		$lastapply = gitcapture("rev-parse", $lastapply);
+		git("checkout", "-q", $lastapply);
+		git("revert", "--no-edit", "-m1", "HEAD");
+		my $revert_commit = gitcapture("rev-parse", "HEAD");
 		my $commitmsg = "NULL-" . commitmsg($prnum, $branchname);
+		git("checkout", "-q", $current_head_commit);
+		{
+			open my $fh, ">", ".git/HEAD";
+			print $fh $current_head_ref;
+			close $fh;
+		}
 		my $tree = gitcapture("write-tree");
-		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $lastapply);
+		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $revert_commit);
 		git("checkout", "-q", $chash);
 	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
 		ensure_ready;
