@@ -251,7 +251,11 @@ while (<$spec>) {
 	} elsif (my ($cherry, $lastapply) = (m/^\t *n\/a\s+\(cherrypick\=($hexd{7,})\)(?:\s+($hexd{7,}))?$/)) {
 		ensure_ready;
 		
-		git("cherry-pick", "--no-commit", $cherry);
+		my @cherrypick_opt;
+		if ((split /\s+/, gitcapture("log", "-1", "--format=\%p", $cherry)) > 1) {
+			push @cherrypick_opt, "-m1";
+		}
+		git("cherry-pick", @cherrypick_opt, "--no-commit", $cherry);
 		
 		if (defined $lastapply) {
 			if (wc_l(gitcapture("log", "--pretty=oneline", "..$lastapply")) != 1) {
