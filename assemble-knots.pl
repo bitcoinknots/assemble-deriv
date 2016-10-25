@@ -99,11 +99,17 @@ sub wc_l {
 	1 + ($_[0] =~ tr/\n//)
 }
 
+my %used_autoresolvers;
+my $producing_autoresolver;
+
 sub userfix {
 	print("Backgrounding so you can fix this...\n");
 	kill('STOP', $$);
 	
 	# SIGCONT resumes here
+	if (-e $producing_autoresolver) {
+		$used_autoresolvers{$producing_autoresolver} = undef;
+	}
 }
 
 sub mymerger {
@@ -140,20 +146,24 @@ retry:
 				goto retry;
 			}
 		}
+		$used_autoresolvers{$difffile} = undef;
 		print("Conflict ID: $conflict_id AUTOPATCHED with $difffile\n");
 		return "clean";
 	}
 	
-	if (-e "$resbase.res") {
-		open(my $resfh, "<", "$resbase.res");
+	my $resfile = "$resbase.res";
+	if (-e $resfile) {
+		open(my $resfh, "<", $resfile);
 		my $res = <$resfh>;
 		close $resfh;
+		$used_autoresolvers{$resfile} = undef;
 		print("Conflict ID: $conflict_id AUTORESOLVING with $res\n");
 		return $res;
 	}
 	
 	gitmayfail("-p", "diff", "--color=always", "HEAD");
 	print("Conflict ID: $conflict_id (use $difffile)\n");
+	$producing_autoresolver = $difffile;
 	
 	''
 }
@@ -410,3 +420,6 @@ while (<$spec>) {
 		die "Unrecognised line: $_"
 	}
 }
+
+print("COMPLETE\n");
+print("Used autoresolvers: " . ((join " ", keys %used_autoresolvers) or '(none)') . "\n");
