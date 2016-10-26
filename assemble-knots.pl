@@ -13,9 +13,11 @@ use IPC::Open2;
 my $expect_to_rebase = 1;
 
 my $make_branches;
+my $out_spec_filename;
 
 GetOptions(
 	"branch|b" => \$make_branches,
+	"outspec|o=s" => \$out_spec_filename,
 );
 
 my $specfn = shift;
@@ -31,6 +33,20 @@ sub slurpfile {
 	my $r = <$fh>;
 	close $fh;
 	$r
+}
+
+sub replace_lastapply {
+	my ($sref, $left, $right, $repl) = @_;
+	if ($right > 0) {
+		substr($$sref, $left, $right - $left) = $repl;
+	} else {
+		my $tmp = substr($$sref, 0, $left);
+		$tmp =~ s/\t/xxxx/;
+		$tmp = 48 - length $tmp;
+		$tmp = 1 if $tmp < 1;
+		my $tabs = "\t" x int(($tmp + 3) / 4);
+		substr($$sref, $left, 0) = "$tabs$repl";
+	}
 }
 
 sub makegitcmd {
@@ -239,8 +255,17 @@ sub set_branch {
 	}
 }
 
+my $out_spec;
+if ($out_spec_filename) {
+	die if -e $out_spec_filename;
+	open $out_spec, ">", $out_spec_filename;
+} else {
+	open $out_spec, ">", "/dev/null";
+}
+
 open(my $spec, '<', $specfn);
 while (<$spec>) {
+	my $line = $_;
 	s/\s*#.*//;  # remove comments
 	if (m/^\s*$/) {
 		# blank line, skip
@@ -263,6 +288,7 @@ while (<$spec>) {
 		set_branch;
 		$active_branch = $1;
 	} elsif (my ($verstr, $lastapply) = (m/^\t *n\/a\s+\(bump\_version\=([^)]+)\)(?:\s+($hexd{7,}))?$/)) {
+		my @lastapply_pos = (defined $lastapply) ? ($-[2], $+[2]) : ($+[1] + 1, -1);
 		ensure_ready;
 		
 		if (defined $lastapply) {
@@ -274,7 +300,10 @@ while (<$spec>) {
 		
 		patchversion($verstr);
 		git("commit", "-am", "Bump version to $verstr");
+		
+		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
 	} elsif (my ($cherry, $lastapply) = (m/^\t *n\/a\s+\(cherrypick\=($hexd{7,})\)(?:\s+($hexd{7,}))?$/)) {
+		my @lastapply_pos = (defined $lastapply) ? ($-[2], $+[2]) : ($+[1] + 1, -1);
 		ensure_ready;
 		
 		my @cherrypick_opt;
@@ -294,7 +323,10 @@ while (<$spec>) {
 		}
 		
 		git("commit", "-aC", $cherry);
-	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)?\s+($hexd{7,})$/)) {
+		
+		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)\s+($hexd{7,})$/)) {
+		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
 		
 		my $current_head_commit = gitcapture("rev-parse", "HEAD");
@@ -313,17 +345,24 @@ while (<$spec>) {
 		my $tree = gitcapture("write-tree");
 		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $revert_commit);
 		git("checkout", "-q", $chash);
-	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *(\d+|\-|n\/a)\s+(\S+)?\s+($hexd{7,})$/)) {
+		
+		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *(\d+|\-|n\/a)\s+(\S+)\s+($hexd{7,})$/)) {
+		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
 		
 		my $commitmsg = "Tree-" . commitmsg($prnum, $branchname);
 		my $tree = gitcapture("write-tree");
 		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $lastapply);
 		git("checkout", "-q", $chash);
+		
+		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
 	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
+		my $rem_offset = $-[3];
 		ensure_ready;
 		$rem =~ m/^(\S+)?(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?$/ or die;
 		my ($branchname, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4);
+		my @lastapply_pos = (defined $lastapply) ? ($-[2] + $rem_offset, $+[2] + $rem_offset) : ($+[1] + $rem_offset, -1);
 		if (not defined $branchname) {
 			die "No branch name?" if not $prnum;
 			$branchname = "origin-pull/$prnum/head";
@@ -432,11 +471,16 @@ while (<$spec>) {
 			my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD^", "-p", $branchparent, "-p", $lastapply);
 			git("checkout", "-q", $chash);
 		}
+		
+		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
 	} else {
 		die "Unrecognised line: $_"
 	}
+	
+	print $out_spec "$line";
 }
 set_branch;
+close $out_spec;
 
 print("COMPLETE\n");
 print("Used autoresolvers: " . ((join " ", keys %used_autoresolvers) or '(none)') . "\n");
