@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 
+use File::Temp;
 use Getopt::Long;
 use IPC::Open2;
 
@@ -14,10 +15,12 @@ my $expect_to_rebase = 1;
 
 my $make_branches;
 my $out_spec_filename;
+my $do_review;
 
 GetOptions(
 	"branch|b" => \$make_branches,
 	"outspec|o=s" => \$out_spec_filename,
+	"review|r" => \$do_review,
 );
 
 my $specfn = shift;
@@ -255,6 +258,41 @@ sub set_branch {
 	}
 }
 
+sub make_temp {
+	my ($data) = @_;
+	my $fh = File::Temp->new();
+	print $fh $data;
+	my $fn = $fh->filename;
+	flush $fh;
+	($fn, $fh)
+}
+
+my @reviewqueue;
+
+sub perform_review {
+	my ($lastapply, $thiscommit) = @_;
+	$thiscommit = "HEAD" unless defined $thiscommit;
+	if ($lastapply) {
+		my $before = gitcapture("diff", "${lastapply}^..$lastapply");
+		my $after = gitcapture("diff", "${thiscommit}^..$thiscommit");
+		my ($before_fn, $before_fh) = make_temp($before);
+		my ($after_fn , $after_fh ) = make_temp($after );
+		system "diff -u '$before_fn' '$after_fn' | less -p '^[-+]{2}'";
+		close $before_fh;
+		close $after_fh;
+	} else {
+		git("--paginate", "diff", "${thiscommit}^..$thiscommit");
+	}
+}
+
+sub ready_to_review {
+	my ($lastapply, $thiscommit) = @_;
+	if (not defined $thiscommit) {
+		$thiscommit = gitcapture("rev-parse", "HEAD");
+	}
+	push @reviewqueue, [$lastapply, $thiscommit];
+}
+
 my $out_spec;
 if ($out_spec_filename) {
 	die if -e $out_spec_filename;
@@ -302,6 +340,7 @@ while (<$spec>) {
 		git("commit", "-am", "Bump version to $verstr");
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
+		ready_to_review($lastapply) if $do_review;
 	} elsif (my ($cherry, $lastapply) = (m/^\t *n\/a\s+\(cherrypick\=($hexd{7,})\)(?:\s+($hexd{7,}))?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[2], $+[2]) : ($+[1] + 1, -1);
 		ensure_ready;
@@ -325,6 +364,7 @@ while (<$spec>) {
 		git("commit", "-aC", $cherry);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
+		ready_to_review($lastapply) if $do_review;
 	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)\s+($hexd{7,})$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
@@ -347,6 +387,7 @@ while (<$spec>) {
 		git("checkout", "-q", $chash);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
+		ready_to_review($lastapply) if $do_review;
 	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *(\d+|\-|n\/a)\s+(\S+)\s+($hexd{7,})$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
@@ -357,6 +398,7 @@ while (<$spec>) {
 		git("checkout", "-q", $chash);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
+		ready_to_review($lastapply) if $do_review;
 	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
 		my $rem_offset = $-[3];
 		ensure_ready;
@@ -473,6 +515,7 @@ while (<$spec>) {
 		}
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
+		ready_to_review($lastapply) if $do_review;
 	} else {
 		die "Unrecognised line: $_"
 	}
@@ -481,6 +524,10 @@ while (<$spec>) {
 }
 set_branch;
 close $out_spec;
+
+for my $rargs (@reviewqueue) {
+	perform_review(@$rargs);
+}
 
 print("COMPLETE\n");
 print("Used autoresolvers: " . ((join " ", keys %used_autoresolvers) or '(none)') . "\n");
