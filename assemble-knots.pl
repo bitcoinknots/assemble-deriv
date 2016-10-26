@@ -519,6 +519,9 @@ while (<$spec>) {
 				}
 			}
 		}
+		if ($is_tree_merge) {
+			die "Should flag as a tree merge: $line";
+		}
 		if ($merge_lastapply and not $is_tree_merge) {
 			# Rewrite commit to parent directly
 			my $tree = gitcapture("write-tree");
