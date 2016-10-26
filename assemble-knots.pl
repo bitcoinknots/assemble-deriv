@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 
+use Getopt::Long;
 use IPC::Open2;
 
 # TODO: cherry-picked commits in rebasing branch
@@ -10,6 +11,12 @@ use IPC::Open2;
 # TODO: do compile & tests after each merge?
 
 my $expect_to_rebase = 1;
+
+my $make_branches;
+
+GetOptions(
+	"branch|b" => \$make_branches,
+);
 
 my $specfn = shift;
 
@@ -224,6 +231,14 @@ sub ensure_ready {
 	die("Need to: " . join(", ", keys(%todo)));
 }
 
+my $active_branch;
+
+sub set_branch {
+	if ($make_branches and defined $active_branch) {
+		git("branch", "NEW_$active_branch");
+	}
+}
+
 open(my $spec, '<', $specfn);
 while (<$spec>) {
 	s/\s*#.*//;  # remove comments
@@ -245,7 +260,8 @@ while (<$spec>) {
 		
 		delete $todo{checkout};
 	} elsif (m/^\@(.*)$/) {
-		#git "checkout", "-b", "NEW_$1";
+		set_branch;
+		$active_branch = $1;
 	} elsif (my ($verstr, $lastapply) = (m/^\t *n\/a\s+\(bump\_version\=([^)]+)\)(?:\s+($hexd{7,}))?$/)) {
 		ensure_ready;
 		
@@ -420,6 +436,7 @@ while (<$spec>) {
 		die "Unrecognised line: $_"
 	}
 }
+set_branch;
 
 print("COMPLETE\n");
 print("Used autoresolvers: " . ((join " ", keys %used_autoresolvers) or '(none)') . "\n");
