@@ -64,11 +64,11 @@ sub gitmayfail {
 
 sub git {
 	my $ec = gitmayfail(@_);
-	die "git @_ failed" if $ec;
+	die "git @_ failed (exit code $ec)" if $ec;
 }
 
-sub gitcapture {
-	my @cmd = makegitcmd(@_);
+sub syscapture {
+	my @cmd = @_;
 	print "@cmd\n";
 	open(my $outio, "-|", @cmd);
 	my $out;
@@ -77,8 +77,15 @@ sub gitcapture {
 		$out = <$outio>;
 	}
 	close $outio;
-	die "git @_ failed" if $?;
+	my $ec = $?;
+	($ec, $out)
+}
+
+sub gitcapture {
+	my @cmd = makegitcmd(@_);
+	my ($ec, $out) = syscapture(@cmd);
 	chomp $out;
+	die "@cmd failed (exit code $ec; output $out)" if $ec;
 	$out
 }
 
@@ -277,9 +284,16 @@ sub perform_review {
 		my $after = gitcapture("diff", "${thiscommit}^..$thiscommit");
 		my ($before_fn, $before_fh) = make_temp($before);
 		my ($after_fn , $after_fh ) = make_temp($after );
-		system "diff -u '$before_fn' '$after_fn' | less -p '^[-+]{2}'";
+		my ($ec, $diffdiff) = syscapture("diff", "-u", $before_fn, $after_fn);
 		close $before_fh;
 		close $after_fh;
+		if ($diffdiff =~ m/^[-+]{2}[^-+]/m) {
+			open my $outio, "|-", "less", "-p", "^[-+]{2}";
+			print $outio $diffdiff;
+			close $outio;
+		} else {
+			print "(no changes)\n";
+		}
 	} else {
 		git("--paginate", "diff", "${thiscommit}^..$thiscommit");
 	}
@@ -387,7 +401,6 @@ while (<$spec>) {
 		git("checkout", "-q", $chash);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
-		ready_to_review($lastapply) if $do_review;
 	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *(\d+|\-|n\/a)\s+(\S+)\s+($hexd{7,})$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
@@ -398,7 +411,6 @@ while (<$spec>) {
 		git("checkout", "-q", $chash);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
-		ready_to_review($lastapply) if $do_review;
 	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
 		my $rem_offset = $-[3];
 		ensure_ready;
@@ -515,7 +527,7 @@ while (<$spec>) {
 		}
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
-		ready_to_review($lastapply) if $do_review;
+		ready_to_review($lastapply) if $do_review and not $is_tree_merge;
 	} else {
 		die "Unrecognised line: $_"
 	}
