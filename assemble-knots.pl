@@ -16,9 +16,11 @@ my $expect_to_rebase = 1;
 my $make_branches;
 my $out_spec_filename;
 my $do_review;
+my $do_fetch;
 
 GetOptions(
 	"branch|b" => \$make_branches,
+	"fetch|f" => \$do_fetch,
 	"outspec|o=s" => \$out_spec_filename,
 	"review|r" => \$do_review,
 );
@@ -239,6 +241,7 @@ my %fetched_remotes;
 
 sub fetchforbranch {
 	my ($branchname) = @_;
+	return unless $do_fetch;
 	if (my ($remote, $remote_ref) = ($branchname =~ m[^([^/]+)\/(.*)$])) {
 		if (exists $fetched_remotes{$remote}) {
 			print "Already fetched $remote earlier\n";
