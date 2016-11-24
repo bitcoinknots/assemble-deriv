@@ -386,20 +386,27 @@ while (<$spec>) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
 		
-		my $current_head_commit = gitcapture("rev-parse", "HEAD");
-		my $current_head_ref = slurpfile(".git/HEAD");
 		$lastapply = gitcapture("rev-parse", $lastapply);
-		git("checkout", "-q", $lastapply);
-		git("revert", "--no-edit", "-m1", "HEAD");
-		my $revert_commit = gitcapture("rev-parse", "HEAD");
-		my $commitmsg = "NULL-" . commitmsg($prnum, $branchname);
-		git("checkout", "-q", $current_head_commit);
-		{
-			open my $fh, ">", ".git/HEAD";
-			print $fh $current_head_ref;
-			close $fh;
+		my $lastdiff = gitcapture("diff", "${lastapply}^..$lastapply");
+		my $revert_commit;
+		if (length $lastdiff) {
+			my $current_head_commit = gitcapture("rev-parse", "HEAD");
+			my $current_head_ref = slurpfile(".git/HEAD");
+			git("checkout", "-q", $lastapply);
+			git("revert", "--no-edit", "-m1", "HEAD");
+			$revert_commit = gitcapture("rev-parse", "HEAD");
+			git("checkout", "-q", $current_head_commit);
+			{
+				open my $fh, ">", ".git/HEAD";
+				print $fh $current_head_ref;
+				close $fh;
+			}
+		} else {
+			# Must have been reverted in previous branch already
+			$revert_commit = $lastapply;
 		}
 		my $tree = gitcapture("write-tree");
+		my $commitmsg = "NULL-" . commitmsg($prnum, $branchname);
 		my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD", "-p", $revert_commit);
 		git("checkout", "-q", $chash);
 		
