@@ -347,7 +347,7 @@ while (<$spec>) {
 		ensure_ready;
 		
 		if (defined $lastapply) {
-			if (wc_l(gitcapture("log", "--pretty=oneline", "..$lastapply")) != 1) {
+			if (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) != 1) {
 				die "Skipping a parent in rebase! Aborting"
 			}
 			git("merge", "--no-commit", $lastapply);
@@ -369,7 +369,7 @@ while (<$spec>) {
 		git("cherry-pick", @cherrypick_opt, "--no-commit", $cherry);
 		
 		if (defined $lastapply) {
-			if (wc_l(gitcapture("log", "--pretty=oneline", "..$lastapply")) != 1) {
+			if (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) != 1) {
 				die "Skipping a parent in rebase! Aborting"
 			}
 			$lastapply = gitcapture("rev-parse", $lastapply);
@@ -445,7 +445,7 @@ while (<$spec>) {
 		
 		my ($merge_lastapply, $merge_more);
 		if (defined $lastapply) {
-			$merge_lastapply = (wc_l(gitcapture("log", "--pretty=oneline", "..$lastapply", "^$branchname")) == 1);
+			$merge_lastapply = (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) == 1);
 			die "Skipping a parent in rebase! Aborting" if $expect_to_rebase and not $merge_lastapply;
 			if ($merge_lastapply) {
 				if ($flags =~ /m/) {
