@@ -350,7 +350,7 @@ while (<$spec>) {
 			if (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) != 1) {
 				die "Skipping a parent in rebase! Aborting"
 			}
-			git("merge", "--no-commit", $lastapply);
+			git("merge", "--no-ff", "--no-commit", $lastapply);
 		}
 		
 		patchversion($verstr);
@@ -467,6 +467,11 @@ while (<$spec>) {
 			}
 		}
 		
+		if (wc_l(gitcapture("log", "--pretty=oneline", "$mainmerge..")) == 0 and not defined $merge_more) {
+			git("merge", "--ff-only", "$mainmerge");
+			goto did_ff;
+		}
+		
 		my $commitmsg = commitmsg($prnum, $branchname);
 		my $is_tree_merge;
 		{
@@ -540,6 +545,7 @@ while (<$spec>) {
 		}
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
+did_ff:
 		ready_to_review($lastapply) if $do_review and not $is_tree_merge;
 	} else {
 		die "Unrecognised line: $_"
