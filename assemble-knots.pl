@@ -148,7 +148,7 @@ sub userfix {
 }
 
 sub mymerger {
-	my ($merge_from) = @_;
+	my ($merge_from, $branchhead, $i_am) = @_;
 	my $ignore_autopatch;
 	my $difffile;
 retry:
@@ -194,6 +194,22 @@ retry:
 		$used_autoresolvers{$resfile} = undef;
 		print("Conflict ID: $conflict_id AUTORESOLVING with $res\n");
 		return $res;
+	}
+	
+	if (defined $branchhead) {
+		# See if the problem is merging, or an outdated branch
+		my $wherewewere = gitcapture("rev-parse", "HEAD");
+		git("reset", "--hard");
+		git("checkout", $branchhead);
+		my $test_merge_ec = gitmayfail("merge", "--no-commit", $merge_from);
+		if ($test_merge_ec == 0) {
+			print "$i_am merges cleanly on base branch...\n";
+			git("reset", "--hard");
+			git("checkout", $wherewewere);
+			undef $branchhead;
+			goto retry;
+		}
+		warn "WARNING: $i_am doesn't merge cleanly on base branch!";
 	}
 	
 	gitmayfail("-p", "diff", "--color=always", "HEAD");
@@ -318,6 +334,8 @@ if ($out_spec_filename) {
 	open $out_spec, ">", "/dev/null";
 }
 
+my $branchhead;
+
 open(my $spec, '<', $specfn);
 while (<$spec>) {
 	my $line = $_;
@@ -330,7 +348,7 @@ while (<$spec>) {
 		
 		delete $todo{timestamp};
 	} elsif (m/^checkout (.*)$/) {
-		my $branchhead = gitcapture("rev-parse", $1);
+		$branchhead = gitcapture("rev-parse", $1);
 		git "checkout", $branchhead;
 		
 		@poison = ();
@@ -475,7 +493,7 @@ while (<$spec>) {
 		my $commitmsg = commitmsg($prnum, $branchname);
 		my $is_tree_merge;
 		{
-			my $res = mymerger($mainmerge);
+			my $res = mymerger($mainmerge, $branchhead, "$prnum $branchname");
 			if ($res eq 'tree') {
 				$is_tree_merge = 1;
 			} elsif ($res eq 'clean') {
@@ -504,7 +522,7 @@ while (<$spec>) {
 		}
 		git("commit", "-am", $commitmsg);
 		if (defined $merge_more) {
-			my $res = mymerger($merge_more);
+			my $res = mymerger($merge_more, $branchhead, "$prnum $branchname");
 			if ($res eq 'tree') {
 				# If it doesn't change anything, just skip it entirely
 				undef $merge_more;
