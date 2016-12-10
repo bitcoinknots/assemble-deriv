@@ -219,6 +219,15 @@ retry:
 	''
 }
 
+sub gitcherrypick {
+	my ($cherry) = @_;
+	my @cherrypick_opt;
+	if ((split /\s+/, gitcapture("log", "-1", "--format=\%p", $cherry)) > 1) {
+		push @cherrypick_opt, "-m1";
+	}
+	git("cherry-pick", @cherrypick_opt, "--no-commit", $cherry);
+}
+
 sub patchversion {
 	my ($verstr) = @_;
 	my $verfile = "src/clientversion.cpp";
@@ -380,11 +389,7 @@ while (<$spec>) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[2], $+[2]) : ($+[1] + 1, -1);
 		ensure_ready;
 		
-		my @cherrypick_opt;
-		if ((split /\s+/, gitcapture("log", "-1", "--format=\%p", $cherry)) > 1) {
-			push @cherrypick_opt, "-m1";
-		}
-		git("cherry-pick", @cherrypick_opt, "--no-commit", $cherry);
+		gitcherrypick($cherry);
 		
 		if (defined $lastapply) {
 			if (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) != 1) {
