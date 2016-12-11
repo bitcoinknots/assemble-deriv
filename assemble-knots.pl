@@ -152,7 +152,7 @@ sub mymerger {
 	my $ignore_autopatch;
 	my $difffile;
 retry:
-	my $merge_ec = gitmayfail("merge", "--no-commit", $merge_from);
+	my $merge_ec = gitmayfail("merge", "--no-ff", "--no-commit", $merge_from);
 	my $diff = gitcapture("diff", "HEAD");
 	if (not $merge_ec) {
 		# Check if it was a no-op
@@ -447,8 +447,8 @@ while (<$spec>) {
 	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
 		my $rem_offset = $-[3];
 		ensure_ready;
-		$rem =~ m/^(\S+)?(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?$/ or die;
-		my ($branchname, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4);
+		$rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?$/ or die;
+		my ($branchname, $manual_conflict_patch, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4);
 		my @lastapply_pos = (defined $lastapply) ? ($-[2] + $rem_offset, $+[2] + $rem_offset) : ($+[1] + $rem_offset, -1);
 		if (not defined $branchname) {
 			die "No branch name?" if not $prnum;
@@ -490,7 +490,7 @@ while (<$spec>) {
 			}
 		}
 		
-		if (wc_l(gitcapture("log", "--pretty=oneline", "$mainmerge..")) == 0 and not defined $merge_more) {
+		if (wc_l(gitcapture("log", "--pretty=oneline", "$mainmerge..")) == 0 and not (defined $merge_more or defined $manual_conflict_patch)) {
 			git("merge", "--ff-only", "$mainmerge");
 			goto did_ff;
 		}
@@ -556,6 +556,12 @@ while (<$spec>) {
 					$branchparent = $lastapply . "^2";
 				}
 			}
+		}
+		if (defined $manual_conflict_patch) {
+			gitcherrypick($manual_conflict_patch);
+			die "Null manual-conflict-patch?" unless wc_l(gitcapture("diff", "HEAD")) > 0;
+			git("commit", "--amend", "--no-edit");
+			undef $is_tree_merge;
 		}
 		if ($is_tree_merge) {
 			die "Should flag as a tree merge: $line";
