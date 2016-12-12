@@ -114,7 +114,7 @@ sub gitresethard_formerge {
 	for my $gitstatusline (split /\0/, $gitstatus) {
 		my ($status, $path) = ($gitstatusline =~ /^(..) (.*)$/);
 		$status =~ s/\s+//;
-		if ($status =~ /^([MDU])\g1?$/) {
+		if ($status =~ /^([MDU])(?:D|\g1)?$/) {
 			git("checkout", "HEAD", $path);
 		} elsif ($status eq 'A') {
 			git("rm", "-f", $path);
