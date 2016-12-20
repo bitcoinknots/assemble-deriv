@@ -209,7 +209,8 @@ retry:
 			undef $branchhead;
 			goto retry;
 		}
-		warn "WARNING: $i_am doesn't merge cleanly on base branch!";
+		# If we make this a warning, we need to go retry to get the right state!
+		die "$i_am doesn't merge cleanly on base branch!\n"
 	}
 	
 	gitmayfail("-p", "diff", "--color=always", "HEAD");
