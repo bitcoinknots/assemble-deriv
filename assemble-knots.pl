@@ -148,7 +148,7 @@ sub userfix {
 }
 
 sub mymerger {
-	my ($merge_from, $branchhead, $i_am) = @_;
+	my ($merge_from, $branchhead, $base_branch_test, $i_am) = @_;
 	my $ignore_autopatch;
 	my $difffile;
 retry:
@@ -196,21 +196,21 @@ retry:
 		return $res;
 	}
 	
-	if (defined $branchhead) {
+	if (defined $base_branch_test) {
 		# See if the problem is merging, or an outdated branch
 		my $wherewewere = gitcapture("rev-parse", "HEAD");
 		git("reset", "--hard");
 		git("checkout", $branchhead);
-		my $test_merge_ec = gitmayfail("merge", "--no-commit", $merge_from);
+		my $test_merge_ec = gitmayfail("merge", "--no-commit", $base_branch_test);
 		if ($test_merge_ec == 0) {
 			print "$i_am merges cleanly on base branch...\n";
 			git("reset", "--hard");
 			git("checkout", $wherewewere);
-			undef $branchhead;
+			undef $base_branch_test;
 			goto retry;
 		}
 		# If we make this a warning, we need to go retry to get the right state!
-		die "$i_am doesn't merge cleanly on base branch!\n"
+		die "$i_am ($base_branch_test) doesn't merge cleanly on base branch!\n"
 	}
 	
 	gitmayfail("-p", "diff", "--color=always", "HEAD");
@@ -499,7 +499,7 @@ while (<$spec>) {
 		my $commitmsg = commitmsg($prnum, $branchname);
 		my $is_tree_merge;
 		{
-			my $res = mymerger($mainmerge, $branchhead, "$prnum $branchname");
+			my $res = mymerger($mainmerge, $branchhead, $branchname, "$prnum $branchname");
 			if ($res eq 'tree') {
 				$is_tree_merge = 1;
 			} elsif ($res eq 'clean') {
@@ -528,7 +528,7 @@ while (<$spec>) {
 		}
 		git("commit", "-am", $commitmsg);
 		if (defined $merge_more) {
-			my $res = mymerger($merge_more, $branchhead, "$prnum $branchname");
+			my $res = mymerger($merge_more, undef, undef, "$prnum $branchname");
 			if ($res eq 'tree') {
 				# If it doesn't change anything, just skip it entirely
 				undef $merge_more;
