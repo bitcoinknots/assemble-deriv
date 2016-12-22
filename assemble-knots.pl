@@ -445,7 +445,7 @@ while (<$spec>) {
 		git("checkout", "-q", $chash);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
-	} elsif (my ($flags, $prnum, $rem) = (m/^(m)?\t *($re_prnum)\s+(.*)$/)) {
+	} elsif (my ($flags, $prnum, $rem) = (m/^([am]+)?\t *($re_prnum)\s+(.*)$/)) {
 		my $rem_offset = $-[3];
 		ensure_ready;
 		$rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?$/ or die;
@@ -499,7 +499,8 @@ while (<$spec>) {
 		my $commitmsg = commitmsg($prnum, $branchname);
 		my $is_tree_merge;
 		{
-			my $res = mymerger($mainmerge, $branchhead, $branchname, "$prnum $branchname");
+			my $base_branch_test = ($flags =~ /a/) ? undef : $branchname;
+			my $res = mymerger($mainmerge, $branchhead, $base_branch_test, "$prnum $branchname");
 			if ($res eq 'tree') {
 				$is_tree_merge = 1;
 			} elsif ($res eq 'clean') {
