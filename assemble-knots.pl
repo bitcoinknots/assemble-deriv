@@ -450,7 +450,7 @@ while (<$spec>) {
 		ensure_ready;
 		$rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?$/ or die;
 		my ($branchname, $manual_conflict_patch, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4);
-		my @lastapply_pos = (defined $lastapply) ? ($-[2] + $rem_offset, $+[2] + $rem_offset) : ($+[1] + $rem_offset, -1);
+		my @lastapply_pos = (defined $lastapply) ? ($-[3] + $rem_offset, $+[3] + $rem_offset) : ($+[2] + $rem_offset, -1);
 		if (not defined $branchname) {
 			die "No branch name?" if not $prnum;
 			$branchname = "origin-pull/$prnum/head";
