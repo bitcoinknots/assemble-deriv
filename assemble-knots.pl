@@ -279,6 +279,7 @@ sub fetchforbranch {
 }
 
 my @poison;
+my $no_lastapply;
 my %todo = map { $_=>undef } qw(checkout timestamp);
 
 sub ensure_ready {
@@ -367,6 +368,13 @@ while (<$spec>) {
 		push @poison, $poisoncommit;
 		
 		delete $todo{checkout};
+	} elsif (m/^lastapply (.*)$/) {
+		my $flags = $1;
+		if ($flags =~ /\bno-merge\b/) {
+			$no_lastapply = 1;
+		} elsif ($flags =~ /\bmerge\b/) {
+			$no_lastapply = 0;
+		}
 	} elsif (m/^\@(.*)$/) {
 		set_branch;
 		$active_branch = $1;
@@ -374,7 +382,7 @@ while (<$spec>) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[2], $+[2]) : ($+[1] + 1, -1);
 		ensure_ready;
 		
-		if (defined $lastapply) {
+		if ((defined $lastapply) and not $no_lastapply) {
 			if (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) != 1) {
 				die "Skipping a parent in rebase! Aborting"
 			}
@@ -392,7 +400,7 @@ while (<$spec>) {
 		
 		gitcherrypick($cherry);
 		
-		if (defined $lastapply) {
+		if ((defined $lastapply) and not $no_lastapply) {
 			if (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) != 1) {
 				die "Skipping a parent in rebase! Aborting"
 			}
@@ -409,6 +417,10 @@ while (<$spec>) {
 	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)\s+($hexd{7,})$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
+		
+		if ($no_lastapply) {
+			die "Null-merge does not make sense with no-lastapply"
+		}
 		
 		$lastapply = gitcapture("rev-parse", $lastapply);
 		my $lastdiff = gitcapture("diff", "${lastapply}^..$lastapply");
@@ -438,6 +450,10 @@ while (<$spec>) {
 	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *(\d+|\-|n\/a)\s+(\S+)\s+($hexd{7,})$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
+		
+		if ($no_lastapply) {
+			die "Null-merge does not make sense with no-lastapply"
+		}
 		
 		my $commitmsg = "Tree-" . commitmsg($prnum, $branchname);
 		my $tree = gitcapture("write-tree");
@@ -476,7 +492,7 @@ while (<$spec>) {
 		}
 		
 		my ($merge_lastapply, $merge_more);
-		if (defined $lastapply) {
+		if ((defined $lastapply) and not $no_lastapply) {
 			$merge_lastapply = (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) == 1);
 			die "Skipping a parent in rebase! Aborting" if $expect_to_rebase and not $merge_lastapply;
 			if ($merge_lastapply) {
