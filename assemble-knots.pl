@@ -468,7 +468,7 @@ while (<$spec>) {
 		# Don't add to the captures without expanding the $n list!
 		my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
 		my @lastapply_pos = (defined $lastapply) ? ($-[4] + $rem_offset, $+[4] + $rem_offset) : ($+[3] + $rem_offset, -1);
-		if (not defined $branchname) {
+		if ((not defined $branchname) or $branchname eq '-') {
 			die "No branch name?" if not $prnum;
 			$branchname = "origin-pull/$prnum/head";
 		}
