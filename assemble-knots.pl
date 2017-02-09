@@ -509,8 +509,12 @@ while (<$spec>) {
 		}
 		
 		if (wc_l(gitcapture("log", "--pretty=oneline", "$mainmerge..")) == 0 and not (defined $merge_more or defined $manual_conflict_patch)) {
-			git("merge", "--ff-only", "$mainmerge");
-			goto did_ff;
+			my $x = gitcapture("log", "--pretty=%P", "--first-parent", "..$mainmerge");
+			# Only fast-forward if we have a single merge commit on top of the current head
+			if (wc_l($x) == 1 and (split /\s+/, $x) > 1) {
+				git("merge", "--ff-only", "$mainmerge");
+				goto did_ff;
+			}
 		}
 		
 		my $commitmsg = commitmsg($prnum, $branchname);
