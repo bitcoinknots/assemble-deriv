@@ -7,8 +7,6 @@ use File::Temp;
 use Getopt::Long;
 use IPC::Open2;
 
-# TODO: cherry-picked commits in rebasing branch
-# TODO: compare result of each merge
 # TODO: do compile & tests after each merge?
 
 my $expect_to_rebase = 1;
