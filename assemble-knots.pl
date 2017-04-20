@@ -166,6 +166,8 @@ retry:
 		return "clean";
 	}
 	
+	print("Conflict in $i_am\n");
+	
 	my $conflict_id = patchid($diff);
 	
 	my $resbase = "assemble-knots-resolutions/$conflict_id";
