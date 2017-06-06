@@ -176,7 +176,7 @@ retry:
 		gitresethard_formerge();
 		my $diffno = 0;
 		$difffile = "$resbase.diff";
-		while (gitmayfail("apply", "--index", "--whitespace=nowarn", $difffile) != 0) {
+		while ((0 != -s $difffile) && gitmayfail("apply", "--index", "--whitespace=nowarn", $difffile) != 0) {
 			print("Conflict ID: $conflict_id AUTOPATCHING: ${difffile} FAILED!\n");
 			$difffile = "${resbase}-" . (++$diffno) . ".diff";
 			if (not -e "$difffile") {
