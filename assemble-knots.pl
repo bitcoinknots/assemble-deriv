@@ -140,6 +140,118 @@ sub wc_l {
 my %used_autoresolvers;
 my $producing_autoresolver;
 
+sub smartconflicthealer {
+	my ($diff) = @_;
+	my @lines = split /\n/, $diff;
+	my @conflicts;
+	my $curfile;
+	for my $lineno (0..$#lines) {
+		my $line = $lines[$lineno];
+		if ($line =~ /^diff/) {
+			if ($line !~ m[\sa\/(.*)\s+b\/\1\b]) {
+				warn("Unparsable file-begin line on diff line $lineno\n");
+				return
+			}
+			$curfile = $1;
+		} elsif ($line =~ /^\+\<{7}/) {
+			if (@conflicts and @{$conflicts[$#conflicts]} != 5) {
+				warn("Found conflict-begin with incomplete last-conflict on diff line $lineno\n");
+				return
+			}
+			if (not defined $curfile) {
+				warn("Found conflict-begin with no known file on diff line $lineno\n");
+				return
+			}
+			push @conflicts, [$curfile, $lineno];
+		} elsif ($line =~ /^\+\|{7}/) {
+			if (@{$conflicts[$#conflicts]} != 2) {
+				warn("Found misplaced common-ancestor-begin on diff line $lineno\n");
+				return
+			}
+			push @{$conflicts[$#conflicts]}, $lineno;
+		} elsif ($line =~ /^\+\={7}/) {
+			if (@{$conflicts[$#conflicts]} != 3) {
+				warn("Found misplaced merged-branch-begin on diff line $lineno\n");
+				return
+			}
+			push @{$conflicts[$#conflicts]}, $lineno;
+		} elsif ($line =~ /^\+\>{7}/) {
+			if (@{$conflicts[$#conflicts]} != 4) {
+				warn("Found misplaced merged-branch-end on diff line $lineno\n");
+				return
+			}
+			push @{$conflicts[$#conflicts]}, $lineno;
+		}
+	}
+	print("Total conflict blocks: " . scalar(@conflicts) . "\n");
+	for my $conflict (@conflicts) {
+		my $diffgroup = $conflict->[1];
+		my $filename = $conflict->[0];
+		my $dirname = $conflict->[0];
+		if (not($dirname =~ s[\/[^/]+$][])) {
+			warn("Error making dirname from '$dirname' for diff group $diffgroup\n");
+			return
+		}
+		my (@head_lines, @common_lines, @merging_lines);
+		for my $lineno ($conflict->[1] + 1..$conflict->[2] - 1) {
+			push @head_lines, substr $lines[$lineno], 1;
+		}
+		for my $lineno ($conflict->[2] + 1..$conflict->[3] - 1) {
+			push @common_lines, substr $lines[$lineno], 1;
+		}
+		for my $lineno ($conflict->[3] + 1..$conflict->[4] - 1) {
+			push @merging_lines, substr $lines[$lineno], 1;
+		}
+		
+		if (@common_lines) {
+			print("Don't know how to deal with common-lines in diff yet\n");
+			return
+		}
+		my (%seen, $type);
+		for my $line (@head_lines, @merging_lines) {
+			if (exists $seen{$line}) {
+				print("HEAD and merging share common lines added on diff group $diffgroup\n");
+				return
+			}
+			my $thistype;
+			if ($line =~ /^(\s*)(\S+)(\s*\\?)$/ and -e "$dirname/$2") {
+				$thistype = "filelist[$1,$3]";
+			} elsif ($line =~ /^\#include ([<"]).*[>"]$/) {
+				$thistype = "include[$1]";
+			} else {
+				warn("Unknown code line in diff group $diffgroup: $line\n");
+				return
+			}
+			if (defined($type) and $thistype ne $type) {
+				warn("Code type mismatch in diff group $diffgroup ($type vs $thistype)\n");
+				return
+			}
+			$type = $thistype;
+		}
+		my @out_lines = sort @head_lines, @merging_lines;
+		
+		# Replace the conflict with the resolution
+		my @in_lines;
+		for my $lineno ($conflict->[1]..$conflict->[4]) {
+			push @in_lines, substr $lines[$lineno], 1;
+		}
+		my $in_lines = join "\n", @in_lines;
+		my $out_lines = join "\n", @out_lines;
+		my $file_contents = slurpfile($filename);
+		my $pos = index $file_contents, $in_lines;
+		if ($pos == -1) {
+			die "Failed to find in_lines in $filename!"
+		}
+		$file_contents = substr($file_contents, 0, $pos) . $out_lines . substr($file_contents, $pos + length($in_lines));
+		open my $fh, ">", $filename or die;
+		print $fh $file_contents;
+		close $fh;
+		print("Healed $type conflict in $filename\n");
+	}
+	print("Healing complete!\n");
+	1
+}
+
 sub userfix {
 	print("Backgrounding so you can fix this...\n");
 	kill('STOP', $$);
@@ -216,6 +328,11 @@ retry:
 		}
 		# If we make this a warning, we need to go retry to get the right state!
 		die "$i_am ($base_branch_test) doesn't merge cleanly on base branch!\n"
+	}
+	
+	# Try to auto-resolve simple cases
+	if (smartconflicthealer($diff)) {
+		return "clean";
 	}
 	
 	gitmayfail("-p", "diff", "--color=always", "HEAD");
