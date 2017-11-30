@@ -29,6 +29,7 @@ GetOptions(
 );
 
 my $specfn = shift;
+die "Too many arguments" if shift;
 
 my $hexd = qr/[\da-f]/i;
 my $re_prnum = qr/\d+|\-|n\/a/;
