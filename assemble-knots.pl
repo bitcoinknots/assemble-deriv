@@ -215,8 +215,8 @@ sub smartconflicthealer {
 				return
 			}
 			my $thistype;
-			if ($line =~ /^(\s*)(\S+)(\s*\\?)$/ and -e "$dirname/$2") {
-				$thistype = "filelist[$1,$3]";
+			if ($line =~ /^(\s*(["']?))(\S+)(\2,?\s*\\?)$/ and -e "$dirname/$3") {
+				$thistype = "filelist[$1,$4]";
 			} elsif ($line =~ /^(\s*)\<file alias\=\"(\S+?)\"\>(\S+?)\<\/file\>(\s*\\?)$/) {
 				$thistype = "xmlfilelist[$1,$4]";
 			} elsif ($line =~ /^\#include ([<"]).*[>"]$/) {
