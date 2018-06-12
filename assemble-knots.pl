@@ -221,6 +221,9 @@ sub smartconflicthealer {
 				$thistype = "xmlfilelist[$1,$4]";
 			} elsif ($line =~ /^\#include ([<"]).*[>"]$/) {
 				$thistype = "include[$1]";
+			} elsif ($line =~ /^\s*$/) {
+				# Safe to ignore blank lines usually
+				goto next_line
 			} else {
 				warn("Unknown code line in diff group $diffgroup: $line\n");
 				return
@@ -230,8 +233,21 @@ sub smartconflicthealer {
 				return
 			}
 			$type = $thistype;
+next_line:
 		}
-		my @out_lines = sort @head_lines, @merging_lines;
+		my @out_lines;
+		while (defined(my $head_line = shift @head_lines)) {
+			if ($head_line =~ /^\s*$/) {
+				push @out_lines, @merging_lines, $head_line, @head_lines;
+				@merging_lines = ();
+				last
+			}
+			while (@merging_lines and $head_line gt $merging_lines[0]) {
+				push @out_lines, shift @merging_lines;
+			}
+			push @out_lines, $head_line;
+		}
+		push @out_lines, @merging_lines;
 		
 		# Replace the conflict with the resolution
 		my @in_lines;
@@ -240,6 +256,7 @@ sub smartconflicthealer {
 		}
 		my $in_lines = join "\n", @in_lines;
 		my $out_lines = join "\n", @out_lines;
+		$out_lines =~ s/\n+/\n/;
 		my $file_contents = slurpfile($filename);
 		my $pos = index $file_contents, $in_lines;
 		if ($pos == -1) {
