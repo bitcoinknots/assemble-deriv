@@ -333,6 +333,11 @@ retry:
 		return $res;
 	}
 	
+	# Try to auto-resolve simple cases
+	if (smartconflicthealer($diff)) {
+		return "clean";
+	}
+	
 	if (defined $base_branch_test) {
 		# See if the problem is merging, or an outdated branch
 		my $wherewewere = gitcapture("rev-parse", "HEAD");
@@ -348,11 +353,6 @@ retry:
 		}
 		# If we make this a warning, we need to go retry to get the right state!
 		die "$i_am ($base_branch_test) doesn't merge cleanly on base branch!\n"
-	}
-	
-	# Try to auto-resolve simple cases
-	if (smartconflicthealer($diff)) {
-		return "clean";
 	}
 	
 	gitmayfail("-p", "diff", "--color=always", "HEAD");
