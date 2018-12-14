@@ -143,6 +143,16 @@ my $producing_autoresolver;
 
 sub smartconflicthealer {
 	my ($diff) = @_;
+	
+	my $gitstatus = gitcapture("status", "-uno", "--porcelain", "-z");
+	for my $gitstatusline (split /\0/, $gitstatus) {
+		my ($status, $path) = ($gitstatusline =~ /^(..) (.*)$/);
+		if ($status !~ /^(?: [AMD]|[MARC][ MD]|D |[MARC][ MD]|[ D][RC]|UU)$/) {
+			warn("Unhandled file status '$status' for file $path\n");
+			return
+		}
+	}
+	
 	my @lines = split /\n/, $diff;
 	my @conflicts;
 	my $curfile;
