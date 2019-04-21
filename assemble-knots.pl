@@ -626,18 +626,21 @@ while (<$spec>) {
 		}
 		fetchforbranch $branchname;
 		if (defined $lastupstream) {
-			if (defined $upstreambranch) {
-				fetchforbranch $upstreambranch;
-				if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
-					die "$prnum $branchname needs updates from upstream $upstreambranch\n";
-				}
+			my @upstream_candidates;
+			push @upstream_candidates, $upstreambranch if defined $upstreambranch;
+			push @upstream_candidates, "origin-pull/$prnum/head" if $prnum =~ /^\d+$/;
+			my ($latest_upstream, $latest_upstream_time);
+			for my $upstream (@upstream_candidates) {
+				my $upstream_time = gitcapture("log", "-1", "--format=\%ct", $upstream, "--");
+				next if defined($latest_upstream) and $latest_upstream_time > $upstream_time;
+				
+				$latest_upstream = $upstream;
+				$latest_upstream_time = $upstream_time;
 			}
-			if ($prnum =~ /^\d+$/ or not defined $upstreambranch) {
-				$upstreambranch = "origin-pull/$prnum/head";
-				fetchforbranch $upstreambranch;
-				if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
-					die "$prnum $branchname needs updates from upstream $upstreambranch\n";
-				}
+			$upstreambranch = $latest_upstream;
+			fetchforbranch $upstreambranch;
+			if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
+				die "$prnum $branchname needs updates from upstream $upstreambranch\n";
 			}
 		}
 		my $branchparent = $branchname;
