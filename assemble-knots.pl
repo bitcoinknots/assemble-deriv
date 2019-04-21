@@ -626,12 +626,18 @@ while (<$spec>) {
 		}
 		fetchforbranch $branchname;
 		if (defined $lastupstream) {
-			if (not defined $upstreambranch) {
-				$upstreambranch = "origin-pull/$prnum/head";
+			if (defined $upstreambranch) {
+				fetchforbranch $upstreambranch;
+				if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
+					die "$prnum $branchname needs updates from upstream $upstreambranch\n";
+				}
 			}
-			fetchforbranch $upstreambranch;
-			if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
-				die "$prnum $branchname needs updates from upstream $upstreambranch\n";
+			if ($prnum =~ /^\d+$/ or not defined $upstreambranch) {
+				$upstreambranch = "origin-pull/$prnum/head";
+				fetchforbranch $upstreambranch;
+				if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
+					die "$prnum $branchname needs updates from upstream $upstreambranch\n";
+				}
 			}
 		}
 		my $branchparent = $branchname;
