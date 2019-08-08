@@ -631,6 +631,8 @@ while (<$spec>) {
 			push @upstream_candidates, "origin-pull/$prnum/head" if $prnum =~ /^\d+$/;
 			my ($latest_upstream, $latest_upstream_time);
 			for my $upstream (@upstream_candidates) {
+				fetchforbranch $upstream;
+				
 				my $upstream_time = gitcapture("log", "-1", "--format=\%ct", $upstream, "--");
 				next if defined($latest_upstream) and $latest_upstream_time > $upstream_time;
 				
