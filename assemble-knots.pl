@@ -624,6 +624,9 @@ while (<$spec>) {
 			die "No branch name?" if not $prnum;
 			$branchname = "origin-pull/$prnum/head";
 		}
+		if ($branchname =~ /\//) {
+			die "Please provide last= for direct remote merge" unless defined $lastupstream;
+		}
 		fetchforbranch $branchname;
 		if (defined $lastupstream) {
 			my @upstream_candidates;
