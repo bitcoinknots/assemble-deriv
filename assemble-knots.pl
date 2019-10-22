@@ -352,7 +352,14 @@ retry:
 		my $wherewewere = gitcapture("rev-parse", "HEAD");
 		# Check if upstream merges
 		my @upstream_info;
+		my %upstream_seen;
 		for my $upstream_candidate (@$upstream_candidates) {
+			my $upstream_commithash = gitcapture("rev-parse", $upstream_candidate);
+			if (exists $upstream_seen{$upstream_commithash}) {
+				push @upstream_info, ("NOTE: $upstream_candidate is the same as " . $upstream_seen{$upstream_commithash} . "\n");
+				next
+			}
+			$upstream_seen{$upstream_commithash} = $upstream_candidate;
 			git("reset", "--hard");
 			git("checkout", $wherewewere);
 			my $ec_at_tip = gitmayfail("merge", "--no-commit", $upstream_candidate);
