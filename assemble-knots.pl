@@ -138,6 +138,17 @@ sub wc_l {
 	1 + ($_[0] =~ tr/\n//)
 }
 
+my @poison;
+sub is_poisoned {
+	my $branchname;
+	for my $poison (@poison) {
+		if (!gitmayfail("merge-base", "--is-ancestor", $poison, $branchname)) {
+			return 1
+		}
+	}
+	0
+}
+
 my %used_autoresolvers;
 my $producing_autoresolver;
 
@@ -366,7 +377,8 @@ retry:
 			git("reset", "--hard");
 			git("checkout", $branchhead);
 			my $ec_at_base = gitmayfail("merge", "--no-commit", $upstream_candidate);
-			push @upstream_info, ("NOTE: $upstream_candidate " . ($ec_at_base ? "NOT" : "IS") . " okay at base, and " . ($ec_at_tip ? "NOT" : "IS") . " okay at tip\n");
+			my $isp = is_poisoned($upstream_candidate) ? " (poisoned)" : "";
+			push @upstream_info, ("NOTE: $upstream_candidate$isp " . ($ec_at_base ? "NOT" : "IS") . " okay at base, and " . ($ec_at_tip ? "NOT" : "IS") . " okay at tip\n");
 		}
 		# See if the problem is merging, or an outdated branch
 		git("reset", "--hard");
@@ -449,7 +461,6 @@ sub fetchforbranch {
 	}
 }
 
-my @poison;
 my $no_lastapply;
 my %todo = map { $_=>undef } qw(checkout timestamp);
 
@@ -670,10 +681,8 @@ while (<$spec>) {
 		my $branchparent = $branchname;
 		my $mainmerge = $branchname;
 		
-		for my $poison (@poison) {
-			if (!gitmayfail("merge-base", "--is-ancestor", $poison, $branchname)) {
-				die "Branch $branchname is poisoned";
-			}
+		if (is_poisoned($branchname)) {
+			die "Branch $branchname is poisoned";
 		}
 		
 		my ($merge_lastapply, $merge_more);
