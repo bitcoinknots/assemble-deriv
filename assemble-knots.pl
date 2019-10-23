@@ -377,7 +377,8 @@ retry:
 			git("reset", "--hard");
 			git("checkout", $branchhead);
 			my $ec_at_base = gitmayfail("merge", "--no-commit", $upstream_candidate);
-			my $isp = is_poisoned($upstream_candidate) ? " (poisoned)" : "";
+			my $upstream_time = gitcapture("log", "-1", "--date=local", "--format=\%cd", $upstream_candidate, "--");
+			my $isp = is_poisoned($upstream_candidate) ? " ($upstream_time; poisoned)" : " ($upstream_time)";
 			push @upstream_info, ("NOTE: $upstream_candidate$isp " . ($ec_at_base ? "NOT" : "IS") . " okay at base, and " . ($ec_at_tip ? "NOT" : "IS") . " okay at tip\n");
 		}
 		# See if the problem is merging, or an outdated branch
