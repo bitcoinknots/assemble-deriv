@@ -656,9 +656,6 @@ while (<$spec>) {
 			$branchname = "origin-pull/$prnum/head";
 		}
 		fetchforbranch $branchname;
-		if ($branchname =~ /\//) {
-			die "Please provide last= for direct remote merge of $prnum $branchname" unless defined $lastupstream;
-		}
 		my @upstream_candidates;
 		if (defined $lastupstream) {
 			push @upstream_candidates, $upstreambranch if defined $upstreambranch;
@@ -789,6 +786,9 @@ while (<$spec>) {
 			my $tree = gitcapture("write-tree");
 			my $chash = gitcapture("commit-tree", $tree, "-m", $commitmsg, "-p", "HEAD^", "-p", $branchparent, "-p", $lastapply);
 			git("checkout", "-q", $chash);
+		}
+		if ($branchname =~ /\//) {
+			die "Please provide last= for direct remote merge of $prnum $branchname" unless defined $lastupstream;
 		}
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
