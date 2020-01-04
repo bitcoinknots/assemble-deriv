@@ -140,7 +140,7 @@ sub wc_l {
 
 my @poison;
 sub is_poisoned {
-	my $branchname;
+	my ($branchname) = @_;
 	for my $poison (@poison) {
 		if (!gitmayfail("merge-base", "--is-ancestor", $poison, $branchname)) {
 			return 1
