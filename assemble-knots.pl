@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # kate: space-indent off;
 
-# Copyright 2016-2017 Luke Dashjr
+# Copyright 2016-2020 Luke Dashjr
 # Note this is presently NOT free software. See LICENSE for details.
 # Use at your own risk. No warranty.
 
