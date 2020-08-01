@@ -44,6 +44,11 @@ sub slurpfile {
 	$r
 }
 
+sub origin_pull_branchname {
+	my ($prnum) = @_;
+	"origin-pull/$prnum/head"
+}
+
 sub replace_lastapply {
 	my ($sref, $left, $right, $repl) = @_;
 	if ($right > 0) {
@@ -653,15 +658,16 @@ while (<$spec>) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[4] + $rem_offset, $+[4] + $rem_offset) : ($+[3] + $rem_offset, -1);
 		if ((not defined $branchname) or $branchname eq '-') {
 			die "No branch name?" if not $prnum;
-			$branchname = "origin-pull/$prnum/head";
+			$branchname = origin_pull_branchname($prnum);
 		}
 		fetchforbranch $branchname;
 		my @upstream_candidates;
 		if (defined $lastupstream) {
 			push @upstream_candidates, $upstreambranch if defined $upstreambranch;
-			push @upstream_candidates, "origin-pull/$prnum/head" if $prnum =~ /^\d+$/;
+			push @upstream_candidates, origin_pull_branchname($prnum);
 			my ($latest_upstream, $latest_upstream_time);
 			for my $upstream (@upstream_candidates) {
+				next unless defined $upstream;
 				fetchforbranch $upstream;
 				
 				my $upstream_time = gitcapture("log", "-1", "--format=\%ct", $upstream, "--");
