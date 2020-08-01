@@ -32,7 +32,7 @@ my $specfn = shift;
 die "Too many arguments" if shift;
 
 my $hexd = qr/[\da-f]/i;
-my $re_prnum = qr/\d+|\-|n\/a/;
+my $re_prnum = qr/[a-z]?\d+|\-|n\/a/;
 my $re_branch = qr/\S+/;
 
 sub slurpfile {
@@ -46,7 +46,14 @@ sub slurpfile {
 
 sub origin_pull_branchname {
 	my ($prnum) = @_;
-	"origin-pull/$prnum/head"
+	my $ret = "origin-pull";
+	$prnum =~ m/^([a-z])?(\d+)/ or return;
+	if (defined $1) {
+		$ret .= "-$1";
+		$prnum = $2;
+	}
+	$ret .= "/$prnum/head";
+	$ret
 }
 
 sub replace_lastapply {
@@ -449,7 +456,7 @@ sub patchversion {
 
 sub commitmsg {
 	my ($prnum, $branchname) = @_;
-	"Merge " . (($prnum > 0) ? "$prnum via " : "") . "$branchname"
+	"Merge " . (($prnum =~ /^[a-z]?\d+$/) ? "$prnum via " : "") . "$branchname"
 }
 
 my %fetched_remotes;
@@ -657,7 +664,7 @@ while (<$spec>) {
 		my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
 		my @lastapply_pos = (defined $lastapply) ? ($-[4] + $rem_offset, $+[4] + $rem_offset) : ($+[3] + $rem_offset, -1);
 		if ((not defined $branchname) or $branchname eq '-') {
-			die "No branch name?" if not $prnum;
+			die "No branch name?" unless $prnum =~ /^[a-z]?\d+$/;
 			$branchname = origin_pull_branchname($prnum);
 		}
 		fetchforbranch $branchname;
