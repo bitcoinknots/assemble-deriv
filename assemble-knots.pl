@@ -630,7 +630,7 @@ while (<$spec>) {
 		git("checkout", "-q", $chash);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
-	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *(\d+|\-|n\/a)\s+(\S+)\s+($hexd{7,})$/)) {
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *($re_prnum)\s+(\S+)\s+($hexd{7,})(?:\s+last\=$hexd{7,}(?:\s+($re_branch))?)?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
 		
