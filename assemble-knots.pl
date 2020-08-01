@@ -609,7 +609,7 @@ while (<$spec>) {
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
 		ready_to_review($lastapply) if $do_review;
-	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *(\d+|\-|n\/a)\s+(\S+)\s+($hexd{7,})$/)) {
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *($re_prnum)\s+(\S+)\s+($hexd{7,})(?:\s+last\=$hexd{7,}(?:\s+($re_branch))?)?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
 		
