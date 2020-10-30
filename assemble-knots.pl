@@ -609,7 +609,7 @@ while (<$spec>) {
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
 		ready_to_review($lastapply) if $do_review;
-	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *($re_prnum)\s+(\S+)\s+($hexd{7,})(?:\s+last\=$hexd{7,}(?:\s+($re_branch))?)?$/)) {
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *($re_prnum)\s+(\S+)\s+($hexd{7,})(?:\s+last\=$hexd{7,}(?:\s+(\!?$re_branch))?)?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
 		
@@ -642,7 +642,7 @@ while (<$spec>) {
 		git("checkout", "-q", $chash);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
-	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *($re_prnum)\s+(\S+)\s+($hexd{7,})(?:\s+last\=$hexd{7,}(?:\s+($re_branch))?)?$/)) {
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *($re_prnum)\s+(\S+)\s+($hexd{7,})(?:\s+last\=$hexd{7,}(?:\s+(\!?$re_branch))?)?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
 		
@@ -659,7 +659,7 @@ while (<$spec>) {
 	} elsif (my ($flags, $prnum, $rem) = (m/^([am]+)?\t *($re_prnum)\s+(.*)$/)) {
 		my $rem_offset = $-[3];
 		ensure_ready;
-		$rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+($re_branch))?)?$/ or die;
+		$rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/ or die;
 		# Don't add to the captures without expanding the $n list!
 		my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
 		my @lastapply_pos = (defined $lastapply) ? ($-[4] + $rem_offset, $+[4] + $rem_offset) : ($+[3] + $rem_offset, -1);
@@ -670,8 +670,17 @@ while (<$spec>) {
 		fetchforbranch $branchname;
 		my @upstream_candidates;
 		if (defined $lastupstream) {
-			push @upstream_candidates, $upstreambranch if defined $upstreambranch;
-			push @upstream_candidates, origin_pull_branchname($prnum);
+			my $include_pr_upstream = 1;
+			if (defined $upstreambranch) {
+				if ($upstreambranch =~ s/^\!//) {
+					# ONLY this upstream
+					undef $include_pr_upstream;
+				}
+				push @upstream_candidates, $upstreambranch;
+			}
+			if ($include_pr_upstream) {
+				push @upstream_candidates, origin_pull_branchname($prnum);
+			}
 			my ($latest_upstream, $latest_upstream_time);
 			for my $upstream (@upstream_candidates) {
 				next unless defined $upstream;
