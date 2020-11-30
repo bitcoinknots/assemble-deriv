@@ -389,7 +389,7 @@ retry:
 			git("reset", "--hard");
 			git("checkout", $branchhead);
 			my $ec_at_base = gitmayfail("merge", "--no-commit", $upstream_candidate);
-			my $upstream_time = gitcapture("log", "-1", "--date=local", "--format=\%cd", $upstream_candidate, "--");
+			my $upstream_time = gitcapture("log", "--no-decorate", "-1", "--date=local", "--format=\%cd", $upstream_candidate, "--");
 			my $isp = is_poisoned($upstream_candidate) ? " ($upstream_time; poisoned)" : " ($upstream_time)";
 			push @upstream_info, ("NOTE: $upstream_candidate$isp " . ($ec_at_base ? "NOT" : "IS") . " okay at base, and " . ($ec_at_tip ? "NOT" : "IS") . " okay at tip\n");
 		}
@@ -419,7 +419,7 @@ retry:
 sub gitcherrypick {
 	my ($cherry) = @_;
 	my @cherrypick_opt;
-	if ((split /\s+/, gitcapture("log", "-1", "--format=\%p", $cherry)) > 1) {
+	if ((split /\s+/, gitcapture("log", "--no-decorate", "-1", "--format=\%p", $cherry)) > 1) {
 		push @cherrypick_opt, "-m1";
 	}
 	git("cherry-pick", @cherrypick_opt, "--no-commit", $cherry);
@@ -558,7 +558,7 @@ while (<$spec>) {
 		git "checkout", $branchhead;
 		
 		@poison = ();
-		my $poisoncommit = gitcapture("log", "..master", "--first-parent", "--reverse", "--format=%H");
+		my $poisoncommit = gitcapture("log", "--no-decorate", "..master", "--first-parent", "--reverse", "--format=%H");
 		$poisoncommit =~ s/\n.*//s;
 		push @poison, $poisoncommit;
 		
@@ -578,7 +578,7 @@ while (<$spec>) {
 		ensure_ready;
 		
 		if ((defined $lastapply) and not $no_lastapply) {
-			if (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) != 1) {
+			if (wc_l(gitcapture("log", "--no-decorate", "--first-parent", "--pretty=%%", "..$lastapply")) != 1) {
 				die "Skipping a parent in rebase! Aborting"
 			}
 			git("merge", "--no-ff", "--no-commit", $lastapply);
@@ -596,7 +596,7 @@ while (<$spec>) {
 		gitcherrypick($cherry);
 		
 		if ((defined $lastapply) and not $no_lastapply) {
-			if (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) != 1) {
+			if (wc_l(gitcapture("log", "--no-decorate", "--first-parent", "--pretty=%%", "..$lastapply")) != 1) {
 				die "Skipping a parent in rebase! Aborting"
 			}
 			$lastapply = gitcapture("rev-parse", $lastapply);
@@ -686,7 +686,7 @@ while (<$spec>) {
 				next unless defined $upstream;
 				fetchforbranch $upstream;
 				
-				my $upstream_time = gitcapture("log", "-1", "--format=\%ct", $upstream, "--");
+				my $upstream_time = gitcapture("log", "--no-decorate", "-1", "--format=\%ct", $upstream, "--");
 				next if defined($latest_upstream) and $latest_upstream_time > $upstream_time;
 				
 				$latest_upstream = $upstream;
@@ -707,7 +707,7 @@ while (<$spec>) {
 		
 		my ($merge_lastapply, $merge_more);
 		if ((defined $lastapply) and not $no_lastapply) {
-			$merge_lastapply = (wc_l(gitcapture("log", "--first-parent", "--pretty=oneline", "..$lastapply")) == 1);
+			$merge_lastapply = (wc_l(gitcapture("log", "--no-decorate", "--first-parent", "--pretty=%%", "..$lastapply")) == 1);
 			die "Skipping a parent in rebase! Aborting" if $expect_to_rebase and not $merge_lastapply;
 			if ($merge_lastapply) {
 				if ($flags =~ /m/) {
@@ -715,15 +715,15 @@ while (<$spec>) {
 				} else {
 					# Regardless of whether the main branch has added commits or not, we want to start by merging the previous merge
 					$mainmerge = $lastapply;
-					if (wc_l(gitcapture("log", "--pretty=oneline", "$lastapply..$branchname")) > 0) {
+					if (wc_l(gitcapture("log", "--no-decorate", "--pretty=%%", "$lastapply..$branchname")) > 0) {
 						$merge_more = $branchname;
 					}
 				}
 			}
 		}
 		
-		if (wc_l(gitcapture("log", "--pretty=oneline", "$mainmerge..")) == 0 and not (defined $merge_more or defined $manual_conflict_patch)) {
-			my $x = gitcapture("log", "--pretty=%P", "--first-parent", "..$mainmerge");
+		if (wc_l(gitcapture("log", "--no-decorate", "--pretty=%%", "$mainmerge..")) == 0 and not (defined $merge_more or defined $manual_conflict_patch)) {
+			my $x = gitcapture("log", "--no-decorate", "--pretty=%P", "--first-parent", "..$mainmerge");
 			# Only fast-forward if we have a single merge commit on top of the current head
 			if (wc_l($x) == 1 and (split /\s+/, $x) > 1) {
 				git("merge", "--ff-only", "$mainmerge");
