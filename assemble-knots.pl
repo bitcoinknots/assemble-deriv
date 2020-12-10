@@ -461,10 +461,18 @@ sub commitmsg {
 
 my %fetched_remotes;
 
+sub remote_of_branch {
+	my ($branchname) = @_;
+	if (my ($remote, $remote_ref) = ($branchname =~ m[^([^/]+)\/(.*)$])) {
+		return $remote
+	}
+	undef
+}
+
 sub fetchforbranch {
 	my ($branchname) = @_;
 	return unless $do_fetch;
-	if (my ($remote, $remote_ref) = ($branchname =~ m[^([^/]+)\/(.*)$])) {
+	if (my $remote = remote_of_branch($branchname)) {
 		if (exists $fetched_remotes{$remote}) {
 			print "Already fetched $remote earlier\n";
 			return
@@ -544,6 +552,38 @@ my $branchhead;
 
 open(my $spec, '<', $specfn);
 my @spec_lines = <$spec>;
+
+sub do_all_fetching {
+	my %to_fetch;
+	sub queue_fetch_of_branch {
+		my ($branchname) = (@_);
+		return unless defined $branchname;
+		return if $branchname =~ /^\(/;
+		my $remote = remote_of_branch($branchname);
+		return unless defined $remote;
+		$to_fetch{$remote} = undef;
+	}
+	for (@spec_lines) {
+		s/\s*#.*//;  # remove comments
+		if (my ($flags, $prnum, $rem) = (m/^([am]+)?\t *($re_prnum)\s+(.*)$/)) {
+			if ($rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/) {
+				my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
+				queue_fetch_of_branch $branchname;
+				if (defined $upstreambranch) {
+					$upstreambranch =~ s/^\!//;
+					queue_fetch_of_branch $upstreambranch;
+				}
+			}
+			queue_fetch_of_branch origin_pull_branchname($prnum);
+		}
+	}
+	
+	git "fetch", "--multiple", "-j999", keys %to_fetch;
+	%fetched_remotes = %to_fetch;
+}
+
+do_all_fetching() if $do_fetch;
+
 while ($_ = shift @spec_lines) {
 	my $line = $_;
 	s/\s*#.*//;  # remove comments
