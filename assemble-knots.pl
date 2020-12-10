@@ -543,7 +543,8 @@ if ($out_spec_filename) {
 my $branchhead;
 
 open(my $spec, '<', $specfn);
-while (<$spec>) {
+my @spec_lines = <$spec>;
+while ($_ = shift @spec_lines) {
 	my $line = $_;
 	s/\s*#.*//;  # remove comments
 	if (m/^\s*$/) {
