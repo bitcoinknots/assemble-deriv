@@ -554,6 +554,8 @@ open(my $spec, '<', $specfn);
 my @spec_lines = <$spec>;
 
 sub do_all_fetching {
+	my %all_git_remotes;
+	$all_git_remotes{$_} = undef for split /\n/, gitcapture("remote");
 	my %to_fetch;
 	sub queue_fetch_of_branch {
 		my ($branchname) = (@_);
@@ -561,6 +563,10 @@ sub do_all_fetching {
 		return if $branchname =~ /^\(/;
 		my $remote = remote_of_branch($branchname);
 		return unless defined $remote;
+		if (not exists $all_git_remotes{$remote}) {
+			warn "WARNING: Remote '$remote' does not exist and will fail later\n";
+			return
+		}
 		$to_fetch{$remote} = undef;
 	}
 	for (@spec_lines) {
