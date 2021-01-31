@@ -610,6 +610,8 @@ sub geninfo {
 			}
 		} elsif (m/^\@(.*)$/) {
 			print "@ $1";
+		} elsif (m/^checkout (.*)$/) {
+			print;
 		}
 	}
 }
