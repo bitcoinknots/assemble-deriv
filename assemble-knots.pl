@@ -609,7 +609,7 @@ sub geninfo {
 				print "BM $branchname $lastapply\n";
 			}
 		} elsif (m/^\@(.*)$/) {
-			print "@ $1";
+			print "@ $1\n";
 		} elsif (m/^checkout (.*)$/) {
 			print;
 		}
