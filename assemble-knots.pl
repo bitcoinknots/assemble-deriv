@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # kate: space-indent off;
 
-# Copyright 2016-2020 Luke Dashjr
+# Copyright 2016-2021 Luke Dashjr
 # Note this is presently NOT free software. See LICENSE for details.
 # Use at your own risk. No warranty.
 
@@ -20,10 +20,12 @@ my $make_branches;
 my $out_spec_filename;
 my $do_review;
 my $do_fetch;
+my $geninfo_only;
 
 GetOptions(
 	"branch|b" => \$make_branches,
 	"fetch|f" => \$do_fetch,
+	"geninfo" => \$geninfo_only,
 	"outspec|o=s" => \$out_spec_filename,
 	"review|r" => \$do_review,
 );
@@ -589,6 +591,33 @@ sub do_all_fetching {
 }
 
 do_all_fetching() if $do_fetch;
+
+sub geninfo {
+	for (@spec_lines) {
+		s/\s*#.*//;  # remove comments
+		if (my ($flags, $prnum, $rem) = (m/^([am]+)?\t *($re_prnum)\s+(.*)$/)) {
+			if ($prnum !~ m[^(?:n\/a|-)$]) {
+				print "PR $prnum\n";
+				next
+			}
+			if ($rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/) {
+				my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
+				if ($branchname =~ m[^\(]) {
+					print "LA $lastapply\n";
+					next
+				}
+				print "BM $branchname $lastapply\n";
+			}
+		} elsif (m/^\@(.*)$/) {
+			print "@ $1";
+		}
+	}
+}
+
+if ($geninfo_only) {
+	geninfo;
+	exit
+}
 
 while ($_ = shift @spec_lines) {
 	my $line = $_;
