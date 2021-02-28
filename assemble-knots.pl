@@ -152,6 +152,8 @@ sub wc_l {
 	1 + ($_[0] =~ tr/\n//)
 }
 
+my $git_dir = gitcapture("rev-parse", "--git-dir");
+
 my @poison;
 sub is_poisoned {
 	my ($branchname) = @_;
@@ -678,7 +680,7 @@ while ($_ = shift @spec_lines) {
 				die "Skipping a parent in rebase! Aborting"
 			}
 			$lastapply = gitcapture("rev-parse", $lastapply);
-			open my $MERGE_HEAD, ">", ".git/MERGE_HEAD";
+			open my $MERGE_HEAD, ">", "$git_dir/MERGE_HEAD";
 			print $MERGE_HEAD $lastapply;
 			close $MERGE_HEAD;
 		}
@@ -697,13 +699,13 @@ while ($_ = shift @spec_lines) {
 			my $lastdiff = gitcapture("diff", "${lastapply}^..$lastapply");
 			if (length $lastdiff) {
 				my $current_head_commit = gitcapture("rev-parse", "HEAD");
-				my $current_head_ref = slurpfile(".git/HEAD");
+				my $current_head_ref = slurpfile("$git_dir/HEAD");
 				git("checkout", "-q", $lastapply);
 				git("revert", "--no-edit", "-m1", "HEAD");
 				$revert_commit = gitcapture("rev-parse", "HEAD");
 				git("checkout", "-q", $current_head_commit);
 				{
-					open my $fh, ">", ".git/HEAD";
+					open my $fh, ">", "$git_dir/HEAD";
 					print $fh $current_head_ref;
 					close $fh;
 				}
@@ -862,7 +864,7 @@ while ($_ = shift @spec_lines) {
 				}
 			}
 			if (defined $merge_more) {
-				unlink(".git/MERGE_HEAD") || die "Failed to remove MERGE_HEAD";
+				unlink("$git_dir/MERGE_HEAD") || die "Failed to remove MERGE_HEAD";
 				git("commit", "-a", "--amend", "--no-edit");
 				undef $is_tree_merge;
 			} else {
