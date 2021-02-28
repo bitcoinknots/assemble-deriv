@@ -687,32 +687,32 @@ while ($_ = shift @spec_lines) {
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
 		ready_to_review($lastapply) if $do_review;
-	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *($re_prnum)\s+(\S+)\s+($hexd{7,})(?:\s+last\=$hexd{7,}(?:\s+(\!?$re_branch))?)?$/)) {
+	} elsif (my ($prnum, $branchname, $lastapply) = (m/^NM\t *($re_prnum)\s+(\S+)\s+($hexd{7,}\b)?(?:\s+last\=$hexd{7,}(?:\s+(\!?$re_branch))?)?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
 		
-		if ($no_lastapply) {
-			die "Null-merge does not make sense with no-lastapply"
-		}
-		
-		$lastapply = gitcapture("rev-parse", $lastapply);
-		my $lastdiff = gitcapture("diff", "${lastapply}^..$lastapply");
 		my $revert_commit;
-		if (length $lastdiff) {
-			my $current_head_commit = gitcapture("rev-parse", "HEAD");
-			my $current_head_ref = slurpfile(".git/HEAD");
-			git("checkout", "-q", $lastapply);
-			git("revert", "--no-edit", "-m1", "HEAD");
-			$revert_commit = gitcapture("rev-parse", "HEAD");
-			git("checkout", "-q", $current_head_commit);
-			{
-				open my $fh, ">", ".git/HEAD";
-				print $fh $current_head_ref;
-				close $fh;
+		if (defined $lastapply) {
+			$lastapply = gitcapture("rev-parse", $lastapply);
+			my $lastdiff = gitcapture("diff", "${lastapply}^..$lastapply");
+			if (length $lastdiff) {
+				my $current_head_commit = gitcapture("rev-parse", "HEAD");
+				my $current_head_ref = slurpfile(".git/HEAD");
+				git("checkout", "-q", $lastapply);
+				git("revert", "--no-edit", "-m1", "HEAD");
+				$revert_commit = gitcapture("rev-parse", "HEAD");
+				git("checkout", "-q", $current_head_commit);
+				{
+					open my $fh, ">", ".git/HEAD";
+					print $fh $current_head_ref;
+					close $fh;
+				}
+			} else {
+				# Must have been reverted in previous branch already
+				$revert_commit = $lastapply;
 			}
 		} else {
-			# Must have been reverted in previous branch already
-			$revert_commit = $lastapply;
+			$revert_commit = $branchname;
 		}
 		my $tree = gitcapture("write-tree");
 		my $commitmsg = "NULL-" . commitmsg($prnum, $branchname);
