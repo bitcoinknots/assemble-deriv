@@ -583,6 +583,8 @@ sub do_all_fetching {
 					$upstreambranch =~ s/^\!//;
 					queue_fetch_of_branch $upstreambranch;
 				}
+			} elsif (my ($lastupstream, $upstreambranch) = (m/^\t *\(CHECK\-LAST\)\s+last\=($hexd{7,})\s+\!?($re_branch)$/)) {
+				queue_fetch_of_branch $upstreambranch;
 			}
 			queue_fetch_of_branch origin_pull_branchname($prnum);
 		}
@@ -727,7 +729,7 @@ while ($_ = shift @spec_lines) {
 		ensure_ready;
 		
 		if ($no_lastapply) {
-			die "Null-merge does not make sense with no-lastapply"
+			die "Tree-merge does not make sense with no-lastapply"
 		}
 		
 		my $commitmsg = "Tree-" . commitmsg($prnum, $branchname);
@@ -896,6 +898,11 @@ while ($_ = shift @spec_lines) {
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
 did_ff:
 		ready_to_review($lastapply) if $do_review and not $is_tree_merge;
+	} elsif (my ($lastupstream, $upstreambranch) = (m/^\t *\(CHECK\-LAST\)\s+last\=($hexd{7,})\s+\!?($re_branch)$/)) {
+		fetchforbranch $upstreambranch;
+		if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
+				die "CHECK-LAST failed for upstream $upstreambranch\n";
+		}
 	} else {
 		die "Unrecognised line: $_"
 	}
