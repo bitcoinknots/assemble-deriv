@@ -588,6 +588,7 @@ sub handle_checkout {
 	
 	@poison = ();
 	my $poisoncommit = gitcapture("log", "--no-decorate", "..master", "--first-parent", "--reverse", "--format=%H");
+	die unless $poisoncommit;
 	$poisoncommit =~ s/\n.*//s;
 	push @poison, $poisoncommit;
 	
