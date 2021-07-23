@@ -581,6 +581,19 @@ if ($out_spec_filename) {
 
 my $branchhead;
 
+sub handle_checkout {
+	my ($checkout) = @_;
+	$branchhead = gitcapture("rev-parse", $checkout);
+	git "checkout", $branchhead;
+	
+	@poison = ();
+	my $poisoncommit = gitcapture("log", "--no-decorate", "..master", "--first-parent", "--reverse", "--format=%H");
+	$poisoncommit =~ s/\n.*//s;
+	push @poison, $poisoncommit;
+	
+	delete $todo{checkout};
+}
+
 open(my $spec, '<', $specfn);
 my @spec_lines = <$spec>;
 
@@ -663,15 +676,7 @@ while ($_ = shift @spec_lines) {
 		
 		delete $todo{timestamp};
 	} elsif (m/^checkout (.*)$/) {
-		$branchhead = gitcapture("rev-parse", $1);
-		git "checkout", $branchhead;
-		
-		@poison = ();
-		my $poisoncommit = gitcapture("log", "--no-decorate", "..master", "--first-parent", "--reverse", "--format=%H");
-		$poisoncommit =~ s/\n.*//s;
-		push @poison, $poisoncommit;
-		
-		delete $todo{checkout};
+		handle_checkout $1;
 	} elsif (m/^lastapply (.*)$/) {
 		my $flags = $1;
 		if ($flags =~ /\bno-merge\b/) {
