@@ -486,6 +486,33 @@ sub fetchforbranch {
 	}
 }
 
+sub get_latest_upstream {
+	my ($prnum, $upstreambranch, $upstream_candidates) = @_;
+	my $include_pr_upstream = 1;
+	if (defined $upstreambranch) {
+		if ($upstreambranch =~ s/^\!//) {
+			# ONLY this upstream
+			undef $include_pr_upstream;
+		}
+		push @$upstream_candidates, $upstreambranch;
+	}
+	if ($include_pr_upstream) {
+		push @$upstream_candidates, origin_pull_branchname($prnum);
+	}
+	my ($latest_upstream, $latest_upstream_time);
+	for my $upstream (@$upstream_candidates) {
+		next unless defined $upstream;
+		fetchforbranch $upstream;
+		
+		my $upstream_time = gitcapture("log", "--no-decorate", "-1", "--format=\%ct", $upstream, "--");
+		next if defined($latest_upstream) and $latest_upstream_time > $upstream_time;
+		
+		$latest_upstream = $upstream;
+		$latest_upstream_time = $upstream_time;
+	}
+	$latest_upstream
+}
+
 my $no_lastapply;
 my %todo = map { $_=>undef } qw(checkout timestamp);
 
@@ -752,28 +779,7 @@ while ($_ = shift @spec_lines) {
 		fetchforbranch $branchname;
 		my @upstream_candidates;
 		if (defined $lastupstream) {
-			my $include_pr_upstream = 1;
-			if (defined $upstreambranch) {
-				if ($upstreambranch =~ s/^\!//) {
-					# ONLY this upstream
-					undef $include_pr_upstream;
-				}
-				push @upstream_candidates, $upstreambranch;
-			}
-			if ($include_pr_upstream) {
-				push @upstream_candidates, origin_pull_branchname($prnum);
-			}
-			my ($latest_upstream, $latest_upstream_time);
-			for my $upstream (@upstream_candidates) {
-				next unless defined $upstream;
-				fetchforbranch $upstream;
-				
-				my $upstream_time = gitcapture("log", "--no-decorate", "-1", "--format=\%ct", $upstream, "--");
-				next if defined($latest_upstream) and $latest_upstream_time > $upstream_time;
-				
-				$latest_upstream = $upstream;
-				$latest_upstream_time = $upstream_time;
-			}
+			my $latest_upstream = get_latest_upstream($prnum, $upstreambranch, \@upstream_candidates);
 			$upstreambranch = $latest_upstream;
 			fetchforbranch $upstreambranch;
 			if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
