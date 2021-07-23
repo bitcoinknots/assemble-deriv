@@ -21,11 +21,13 @@ my $out_spec_filename;
 my $do_review;
 my $do_fetch;
 my $geninfo_only;
+my $mergability_check;
 
 GetOptions(
 	"branch|b" => \$make_branches,
 	"fetch|f" => \$do_fetch,
 	"geninfo" => \$geninfo_only,
+	"mergability-check=s" => \$mergability_check,
 	"outspec|o=s" => \$out_spec_filename,
 	"review|r" => \$do_review,
 );
@@ -156,13 +158,22 @@ my $git_dir = gitcapture("rev-parse", "--git-dir");
 
 my @poison;
 sub is_poisoned {
-	my ($branchname) = @_;
-	for my $poison (@poison) {
+       my ($branchname, $poison_list) = @_;
+       $poison_list = \@poison unless defined $poison_list;
+       for my $poison (@$poison_list) {
 		if (!gitmayfail("merge-base", "--is-ancestor", $poison, $branchname)) {
 			return 1
 		}
 	}
 	0
+}
+
+my @mergability_check_poison;
+if (defined $mergability_check) {
+	my $poisoncommit = gitcapture("log", "--no-decorate", "$mergability_check..master", "--first-parent", "--reverse", "--format=%H");
+	die unless $poisoncommit;
+	$poisoncommit =~ s/\n.*//s;
+	push @mergability_check_poison, $poisoncommit;
 }
 
 my %used_autoresolvers;
@@ -663,6 +674,53 @@ sub geninfo {
 
 if ($geninfo_only) {
 	geninfo;
+	exit
+}
+
+sub is_clean_merge {
+	my ($base, $branch, $poisons) = @_;
+	if (is_poisoned($branch, $poisons)) {
+		return 0;  # always fail a poisoned branch
+	}
+	
+	git("checkout", "--detach", $base);
+	my $ec = gitmayfail("merge", "--no-commit", $branch);
+	git("reset", "--hard");
+	
+	not $ec
+}
+
+sub do_mergability_check {
+	open(my $mergability_out_fh, ">&", 3);
+	for (@spec_lines) {
+		my $specline = $_;
+		s/\s*#.*//;  # remove comments
+		if (m/^checkout (.*)$/) {
+			handle_checkout $1;
+		} elsif (my ($flags, $prnum, $rem) = (m/^([am]+)?\t *($re_prnum)\s+(.*)$/)) {
+			if ($rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/) {
+				my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
+				my @upstream_candidates;
+				my $latest_upstream = get_latest_upstream($prnum, $upstreambranch, \@upstream_candidates);
+				if (not defined $latest_upstream) {
+					next
+				}
+				if (is_clean_merge($mergability_check, $latest_upstream, \@mergability_check_poison)) {
+					# Merge onto old base was clean
+					# The fork must have been for some reason other than a simple rebase
+					next
+				}
+				if (is_clean_merge($branchhead, $latest_upstream, \@poison)) {
+					# A merge which was not clean before, is now clean
+					print $mergability_out_fh $specline;
+				}
+			}
+		}
+	}
+}
+
+if (defined $mergability_check) {
+	do_mergability_check;
 	exit
 }
 
