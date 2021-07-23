@@ -702,6 +702,12 @@ sub do_mergability_check {
 				my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
 				my @upstream_candidates;
 				my $latest_upstream = get_latest_upstream($prnum, $upstreambranch, \@upstream_candidates);
+				if ($branchname ~~ @upstream_candidates or $branchname =~ /\//) {
+					# We're using an upstream branch already - just be sure it's the latest
+					if (gitcapture("rev-parse", $branchname) eq gitcapture("rev-parse", $latest_upstream)) {
+						next
+					}
+				}
 				if (not defined $latest_upstream) {
 					next
 				}
