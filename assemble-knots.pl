@@ -22,6 +22,7 @@ my $do_review;
 my $do_fetch;
 my $geninfo_only;
 my $mergability_check;
+my $skip_update_check;
 
 GetOptions(
 	"branch|b" => \$make_branches,
@@ -30,6 +31,7 @@ GetOptions(
 	"mergability-check=s" => \$mergability_check,
 	"outspec|o=s" => \$out_spec_filename,
 	"review|r" => \$do_review,
+	"skip-update-check" => \$skip_update_check,
 );
 
 my $specfn = shift;
@@ -848,7 +850,7 @@ while ($_ = shift @spec_lines) {
 		}
 		fetchforbranch $branchname;
 		my @upstream_candidates;
-		if (defined $lastupstream) {
+		if ((not $skip_update_check) and defined $lastupstream) {
 			my $latest_upstream = get_latest_upstream($prnum, $upstreambranch, \@upstream_candidates);
 			$upstreambranch = $latest_upstream;
 			fetchforbranch $upstreambranch;
