@@ -72,7 +72,11 @@ sub replace_lastapply {
 		$tmp = 48 - length $tmp;
 		$tmp = 1 if $tmp < 1;
 		my $tabs = "\t" x int(($tmp + 3) / 4);
-		substr($$sref, $left, 0) = "$tabs$repl";
+		my $tabs_to_drop = 0;
+		if (substr($$sref, $left) =~ m[\t(\t+)]) {
+			$tabs_to_drop = length $1;
+		}
+		substr($$sref, $left, $tabs_to_drop) = "$tabs$repl";
 	}
 }
 
