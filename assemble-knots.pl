@@ -605,9 +605,14 @@ sub handle_checkout {
 	
 	@poison = ();
 	my $poisoncommit = gitcapture("log", "--no-decorate", "..master", "--first-parent", "--reverse", "--format=%H");
-	die unless $poisoncommit;
-	$poisoncommit =~ s/\n.*//s;
-	push @poison, $poisoncommit;
+	if ($poisoncommit) {
+		$poisoncommit =~ s/\n.*//s;
+		push @poison, $poisoncommit;
+	} elsif ($checkout eq "master") {
+		print("NOTE: Explicitly building on top of master; poison checks disabled")
+	} else {
+		die
+	}
 	
 	delete $todo{checkout};
 }
