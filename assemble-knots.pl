@@ -609,7 +609,7 @@ sub handle_checkout {
 		$poisoncommit =~ s/\n.*//s;
 		push @poison, $poisoncommit;
 	} elsif ($checkout eq "master") {
-		print("NOTE: Explicitly building on top of master; poison checks disabled")
+		print("NOTE: Explicitly building on top of master; poison checks disabled\n")
 	} else {
 		die
 	}
