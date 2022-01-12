@@ -741,6 +741,8 @@ if (defined $mergability_check) {
 	exit
 }
 
+my $last_rnf_delete;
+
 while ($_ = shift @spec_lines) {
 	my $line = $_;
 	s/\s*#.*//;  # remove comments
@@ -763,6 +765,36 @@ while ($_ = shift @spec_lines) {
 	} elsif (m/^\@(.*)$/) {
 		set_branch;
 		$active_branch = $1;
+	} elsif (my ($verstr, $lastapply) = (m/^\t *n\/a\s+\(delete\_release\_notes\_fragments\)(?:\s+($hexd{7,}))?$/)) {
+		my @lastapply_pos = (defined $lastapply) ? ($-[2], $+[2]) : ($+[1] + 1, -1);
+		ensure_ready;
+		
+		$last_rnf_delete = $branchhead unless defined $last_rnf_delete;
+		my @git_diff_status = gitcapture("diff", "$last_rnf_delete..", "--name-status");
+		my $found_rnf_to_delete;
+		for my $status_line (@git_diff_status) {
+			next unless $status_line =~ m[^A\s+(doc\/release.notes.*)$];
+			my $filepath = $1;
+			$found_rnf_to_delete = 1;
+			git("rm", $filepath);
+		}
+		if ((defined $lastapply) and not $no_lastapply) {
+			if (wc_l(gitcapture("log", "--no-decorate", "--first-parent", "--pretty=%%", "..$lastapply")) != 1) {
+				die "Skipping a parent in rebase! Aborting"
+			}
+			$lastapply = gitcapture("rev-parse", $lastapply);
+			open my $MERGE_HEAD, ">", "$git_dir/MERGE_HEAD";
+			print $MERGE_HEAD $lastapply;
+			close $MERGE_HEAD;
+			$found_rnf_to_delete = 1;
+		}
+		next unless $found_rnf_to_delete;
+		
+		git("commit", "--allow-empty", "-m", "Delete release notes fragments");
+		$last_rnf_delete = gitcapture("rev-parse", "--short", "HEAD");
+		
+		replace_lastapply(\$line, @lastapply_pos, $last_rnf_delete);
+		ready_to_review($lastapply) if $do_review;
 	} elsif (my ($verstr, $lastapply) = (m/^\t *n\/a\s+\(bump\_version\=([^)]+)\)(?:\s+($hexd{7,}))?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[2], $+[2]) : ($+[1] + 1, -1);
 		ensure_ready;
