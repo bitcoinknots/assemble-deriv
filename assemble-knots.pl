@@ -765,7 +765,7 @@ while ($_ = shift @spec_lines) {
 	} elsif (m/^\@(.*)$/) {
 		set_branch;
 		$active_branch = $1;
-	} elsif (my ($verstr, $lastapply) = (m/^\t *n\/a\s+\(delete\_release\_notes\_fragments\)(?:\s+($hexd{7,}))?$/)) {
+	} elsif (my ($lastapply) = (m/^\t *n\/a\s+\(delete\_release\_notes\_fragments\)(?:\s+($hexd{7,}))?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[2], $+[2]) : ($+[1] + 1, -1);
 		ensure_ready;
 		
