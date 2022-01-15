@@ -770,7 +770,7 @@ while ($_ = shift @spec_lines) {
 		ensure_ready;
 		
 		$last_rnf_delete = $branchhead unless defined $last_rnf_delete;
-		my @git_diff_status = gitcapture("diff", "$last_rnf_delete..", "--name-status");
+		my @git_diff_status = split /\n/, gitcapture("diff", "$last_rnf_delete..", "--name-status");
 		my $found_rnf_to_delete;
 		for my $status_line (@git_diff_status) {
 			next unless $status_line =~ m[^A\s+(doc\/release.notes.*)$];
