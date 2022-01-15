@@ -771,13 +771,13 @@ while ($_ = shift @spec_lines) {
 		
 		$last_rnf_delete = $branchhead unless defined $last_rnf_delete;
 		my @git_diff_status = split /\n/, gitcapture("diff", "$last_rnf_delete..", "--name-status");
-		my $found_rnf_to_delete;
+		my @rnf_to_delete;
 		for my $status_line (@git_diff_status) {
 			next unless $status_line =~ m[^A\s+(doc\/release.notes.*)$];
 			my $filepath = $1;
-			$found_rnf_to_delete = 1;
-			git("rm", $filepath);
+			push @rnf_to_delete, $filepath;
 		}
+		git("rm", @rnf_to_delete) if @rnf_to_delete;
 		if ((defined $lastapply) and not $no_lastapply) {
 			if (wc_l(gitcapture("log", "--no-decorate", "--first-parent", "--pretty=%%", "..$lastapply")) != 1) {
 				die "Skipping a parent in rebase! Aborting"
@@ -786,9 +786,9 @@ while ($_ = shift @spec_lines) {
 			open my $MERGE_HEAD, ">", "$git_dir/MERGE_HEAD";
 			print $MERGE_HEAD $lastapply;
 			close $MERGE_HEAD;
-			$found_rnf_to_delete = 1;
+		} else {
+			next unless @rnf_to_delete;
 		}
-		next unless $found_rnf_to_delete;
 		
 		git("commit", "--allow-empty", "-m", "Delete release notes fragments");
 		$last_rnf_delete = gitcapture("rev-parse", "--short", "HEAD");
