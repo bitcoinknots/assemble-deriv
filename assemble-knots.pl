@@ -1016,6 +1016,7 @@ while ($_ = shift @spec_lines) {
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
 did_ff:
+		$line =~ s/^(\w*)m(\w*)/$1$2/;
 		ready_to_review($lastapply) if $do_review and not $is_tree_merge;
 	} elsif (my ($lastupstream, $upstreambranch) = (m/^\t *\(CHECK\-LAST\)\s+last\=($hexd{7,})\s+\!?($re_branch)$/)) {
 		fetchforbranch $upstreambranch;
