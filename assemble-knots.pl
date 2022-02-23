@@ -569,9 +569,7 @@ sub perform_review {
 		close $before_fh;
 		close $after_fh;
 		if ($diffdiff =~ m/^[-+]{2}[^-+]/m) {
-			open my $outio, "|-", "less", "-p", "^[-+]{2}";
-			print $outio $diffdiff;
-			close $outio;
+			system("sh", "-c", "LESS=\"\$LESS -p ^[-+]{2}\" git diff --no-index $before_fn $after_fn");
 		} else {
 			print "(no changes)\n";
 		}
