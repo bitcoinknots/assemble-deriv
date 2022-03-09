@@ -609,7 +609,7 @@ sub handle_checkout {
 	} elsif ($checkout =~ m[(?:^|\/)master$]) {
 		print("NOTE: Explicitly building on top of $checkout; poison checks disabled\n")
 	} else {
-		die
+		die "ERROR: Can't figure out poison commit. (Do you need to pull master?)";
 	}
 	
 	delete $todo{checkout};
