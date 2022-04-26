@@ -200,6 +200,7 @@ sub smartconflicthealer {
 	my @lines = split /\n/, $diff;
 	my @conflicts;
 	my $curfile;
+	my $curfunc;
 	for my $lineno (0..$#lines) {
 		my $line = $lines[$lineno];
 		if ($line =~ /^diff/) {
@@ -208,6 +209,9 @@ sub smartconflicthealer {
 				return
 			}
 			$curfile = $1;
+			undef $curfunc;
+		} elsif ($line =~ m[^\@\@ .*? \@\@ (.*)]) {
+			$curfunc = $1;
 		} elsif ($line =~ /^\+\<{7}/) {
 			if (@conflicts and @{$conflicts[$#conflicts]} != 5) {
 				warn("Found conflict-begin with incomplete last-conflict on diff line $lineno\n");
@@ -217,7 +221,7 @@ sub smartconflicthealer {
 				warn("Found conflict-begin with no known file on diff line $lineno\n");
 				return
 			}
-			push @conflicts, [$curfile, $lineno];
+			push @conflicts, [[$curfile, $curfunc], $lineno];
 		} elsif ($line =~ /^\+\|{7}/) {
 			if (@{$conflicts[$#conflicts]} != 2) {
 				warn("Found misplaced common-ancestor-begin on diff line $lineno\n");
@@ -241,12 +245,13 @@ sub smartconflicthealer {
 	print("Total conflict blocks: " . scalar(@conflicts) . "\n");
 	for my $conflict (@conflicts) {
 		my $diffgroup = $conflict->[1];
-		my $filename = $conflict->[0];
-		my $dirname = $conflict->[0];
+		my $filename = $conflict->[0]->[0];
+		my $dirname = $filename;
 		if (not($dirname =~ s[\/[^/]+$][])) {
 			warn("Error making dirname from '$dirname' for diff group $diffgroup\n");
 			return
 		}
+		my $func = $conflict->[0]->[1];
 		my (@head_lines, @common_lines, @merging_lines);
 		for my $lineno ($conflict->[1] + 1..$conflict->[2] - 1) {
 			push @head_lines, substr $lines[$lineno], 1;
@@ -278,6 +283,10 @@ sub smartconflicthealer {
 			} elsif ($line =~ /^\s*$/) {
 				# Safe to ignore blank lines usually
 				goto next_line
+			} elsif ($filename =~ m[rpc\/client\.cpp$] and $func =~ m[\bCRPCConvertParam\s+\w+\[\]\s*\=$] and $line =~ /^\s+\{\s*\"\w+\"\,\s+\d+\,\s+\"\w+\"\s*\}\,$/) {
+				$thistype = "RPCConvertParams";
+			} elsif ($filename =~ m[\/rpc\/] and $func =~ m[\bCRPCCommand\s+\w+\[\]\s*\=$] and $line =~ /^\s+\{\s*\"\w+\"\,\s+\&\w+\,?\s*\}\,$/) {
+				$thistype = "RPCCommands";
 			} else {
 				warn("Unknown code line in diff group $diffgroup: $line\n");
 				return
