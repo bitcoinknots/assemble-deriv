@@ -645,7 +645,7 @@ sub do_all_fetching {
 	}
 	for (@spec_lines) {
 		s/\s*#.*//;  # remove comments
-		if (my ($flags, $prnum, $rem) = (m/^([am]+)?\t *($re_prnum)\s+(.*)$/)) {
+		if (my ($flags, $prnum, $rem) = (m/^([am]*)\t *($re_prnum)\s+(.*)$/)) {
 			if ($rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/) {
 				my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
 				queue_fetch_of_branch $branchname;
@@ -669,7 +669,7 @@ do_all_fetching() if $do_fetch;
 sub geninfo {
 	for (@spec_lines) {
 		s/\s*#.*//;  # remove comments
-		if (my ($flags, $prnum, $rem) = (m/^([am]+)?\t *($re_prnum)\s+(.*)$/)) {
+		if (my ($flags, $prnum, $rem) = (m/^([am]*)\t *($re_prnum)\s+(.*)$/)) {
 			if ($prnum !~ m[^(?:n\/a|-)$]) {
 				print "PR $prnum\n";
 				next
@@ -715,7 +715,7 @@ sub do_mergability_check {
 		s/\s*#.*//;  # remove comments
 		if (m/^checkout (.*)$/) {
 			handle_checkout $1;
-		} elsif (my ($flags, $prnum, $rem) = (m/^([am]+)?\t *($re_prnum)\s+(.*)$/)) {
+		} elsif (my ($flags, $prnum, $rem) = (m/^([am]*)\t *($re_prnum)\s+(.*)$/)) {
 			if ($rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/) {
 				my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
 				my @upstream_candidates;
@@ -885,7 +885,7 @@ while ($_ = shift @spec_lines) {
 		git("checkout", "-q", $chash);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
-	} elsif (my ($flags, $prnum, $rem) = (m/^([am]+)?\t *($re_prnum)\s+(.*)$/)) {
+	} elsif (my ($flags, $prnum, $rem) = (m/^([am]*)\t *($re_prnum)\s+(.*)$/)) {
 		my $rem_offset = $-[3];
 		ensure_ready;
 		$rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/ or die;
