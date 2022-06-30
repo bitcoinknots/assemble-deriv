@@ -772,7 +772,7 @@ while ($_ = shift @spec_lines) {
 	} elsif (m/^\@(.*)$/) {
 		set_branch;
 		$active_branch = $1;
-	} elsif (my ($lastapply) = (m/^\t *n\/a\s+\(delete\_release\_notes\_fragments\)(?:\s+($hexd{7,}))?$/)) {
+	} elsif (my ($funcname, $lastapply) = (m/^\t *n\/a\s+\((delete\_release\_notes\_fragments)\)(?:\s+($hexd{7,}))?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[2], $+[2]) : ($+[1] + 1, -1);
 		ensure_ready;
 		
@@ -793,8 +793,9 @@ while ($_ = shift @spec_lines) {
 			open my $MERGE_HEAD, ">", "$git_dir/MERGE_HEAD";
 			print $MERGE_HEAD $lastapply;
 			close $MERGE_HEAD;
-		} else {
-			next unless @rnf_to_delete;
+		} elsif (not @rnf_to_delete) {
+			replace_lastapply(\$line, @lastapply_pos, $last_rnf_delete);
+			next
 		}
 		
 		git("commit", "--allow-empty", "-m", "Delete release notes fragments");
