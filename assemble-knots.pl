@@ -710,10 +710,12 @@ sub is_clean_merge {
 
 sub do_mergability_check {
 	open(my $mergability_out_fh, ">&", 3);
+	my $checkout_ref;
 	for (@spec_lines) {
 		my $specline = $_;
 		s/\s*#.*//;  # remove comments
 		if (m/^checkout (.*)$/) {
+			$checkout_ref = $1;
 			handle_checkout $1;
 		} elsif (my ($flags, $prnum, $rem) = (m/^([am]*)\t *($re_prnum)\s+(.*)$/)) {
 			if ($rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/) {
@@ -729,10 +731,17 @@ sub do_mergability_check {
 				if (not defined $latest_upstream) {
 					next
 				}
+				my $is_merged_already = !gitmayfail("merge-base", "--is-ancestor", $latest_upstream, $branchhead);
 				if (is_clean_merge($mergability_check, $latest_upstream, \@mergability_check_poison)) {
 					# Merge onto old base was clean
 					# The fork must have been for some reason other than a simple rebase
+					if ($is_merged_already) {
+						print $mergability_out_fh "MERGED IN $checkout_ref, BUT INEXPLICABLY FORKED: $specline";
+					}
 					next
+				}
+				if ($is_merged_already) {
+					$specline =~ s/^/MERGED IN $checkout_ref: /;
 				}
 				if (is_clean_merge($branchhead, $latest_upstream, \@poison)) {
 					# A merge which was not clean before, is now clean
