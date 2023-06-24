@@ -631,7 +631,7 @@ sub do_all_fetching {
 	my %all_git_remotes;
 	$all_git_remotes{$_} = undef for split /\n/, gitcapture("remote");
 	my %to_fetch;
-	sub queue_fetch_of_branch {
+	my $queue_fetch_of_branch = sub {
 		my ($branchname) = (@_);
 		return unless defined $branchname;
 		return if $branchname =~ /^\(/;
@@ -642,21 +642,21 @@ sub do_all_fetching {
 			return
 		}
 		$to_fetch{$remote} = undef;
-	}
+	};
 	for (@spec_lines) {
 		s/\s*#.*//;  # remove comments
 		if (my ($flags, $prnum, $rem) = (m/^([am]*)\t *($re_prnum)\s+(.*)$/)) {
 			if ($rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/) {
 				my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
-				queue_fetch_of_branch $branchname;
+				$queue_fetch_of_branch->($branchname);
 				if (defined $upstreambranch) {
 					$upstreambranch =~ s/^\!//;
-					queue_fetch_of_branch $upstreambranch;
+					$queue_fetch_of_branch->($upstreambranch);
 				}
 			} elsif (my ($lastupstream, $upstreambranch) = (m/^\t *\(CHECK\-LAST\)\s+last\=($hexd{7,})\s+\!?($re_branch)$/)) {
-				queue_fetch_of_branch $upstreambranch;
+				$queue_fetch_of_branch->($upstreambranch);
 			}
-			queue_fetch_of_branch origin_pull_branchname($prnum);
+			$queue_fetch_of_branch->(origin_pull_branchname($prnum));
 		}
 	}
 	
