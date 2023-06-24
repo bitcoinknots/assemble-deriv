@@ -32,7 +32,7 @@ GetOptions(
 	"outspec|o=s" => \$out_spec_filename,
 	"review|r" => \$do_review,
 	"skip-update-check" => \$skip_update_check,
-);
+) or exit 1;
 
 my $specfn = shift;
 die "Too many arguments" if shift;
