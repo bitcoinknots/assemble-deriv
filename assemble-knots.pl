@@ -666,12 +666,9 @@ sub do_all_fetching {
 	git "fetch", "--multiple", "-j999", keys %to_fetch;
 	%fetched_remotes = %to_fetch;
 	
-	my %all_git_branches;
-	$all_git_branches{$_} = undef for split /\n/, gitcapture("for-each-ref", "--format=%(refname:short)", (map { "refs/remotes/$_" } keys %all_git_remotes), "refs/heads");
+	delete $all_needed_git_branches{$_} for split /\n/, gitcapture("for-each-ref", "--format=%(refname:short)", (map { "refs/remotes/$_" } keys %all_git_remotes), "refs/heads");
 	for my $branchname (sort keys %all_needed_git_branches) {
-		if (not exists $all_git_branches{$branchname}) {
-			warn "WARNING: Branch '$branchname' does not exist and will fail later\n";
-		}
+		warn "WARNING: Branch '$branchname' does not exist and will fail later\n";
 	}
 }
 
