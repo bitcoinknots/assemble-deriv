@@ -64,6 +64,9 @@ sub origin_pull_branchname {
 
 sub replace_lastapply {
 	my ($sref, $left, $right, $repl) = @_;
+	if (not defined $repl) {
+		$repl = "\t" x int(($right - $left + 3) / 4);
+	}
 	if ($right > 0) {
 		substr($$sref, $left, $right - $left) = $repl;
 	} else {
@@ -78,6 +81,7 @@ sub replace_lastapply {
 		}
 		substr($$sref, $left, $tabs_to_drop) = "$tabs$repl";
 	}
+	$$sref =~ s/\s*?(\n)?$/$1/;
 }
 
 sub makegitcmd {
@@ -811,8 +815,8 @@ while ($_ = shift @spec_lines) {
 			print $MERGE_HEAD $lastapply;
 			close $MERGE_HEAD;
 		} elsif (not @rnf_to_delete) {
-			replace_lastapply(\$line, @lastapply_pos, $last_rnf_delete);
-			next
+			replace_lastapply(\$line, @lastapply_pos, undef);
+			goto next_in_line
 		}
 		
 		git("commit", "--allow-empty", "-m", "Delete release notes fragments");
@@ -1052,6 +1056,7 @@ did_ff:
 		die "Unrecognised line: $_"
 	}
 	
+next_in_line:
 	print $out_spec "$line";
 }
 set_branch;
