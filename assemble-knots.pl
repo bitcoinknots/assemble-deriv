@@ -90,7 +90,7 @@ sub makegitcmd {
 
 sub gitmayfail {
 	my @cmd = makegitcmd(@_);
-	print "@cmd\n";
+	print STDERR "@cmd\n";
 	system @cmd
 }
 
@@ -101,7 +101,7 @@ sub git {
 
 sub syscapture {
 	my @cmd = @_;
-	print "@cmd\n";
+	print STDERR "@cmd\n";
 	open(my $outio, "-|", @cmd);
 	my $out;
 	{
