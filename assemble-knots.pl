@@ -641,6 +641,7 @@ sub do_all_fetching {
 		return unless defined $branchname;
 		return if $branchname =~ /^\(/;
 		return if $branchname eq "-";
+		$branchname =~ s/\^+//;
 		$all_needed_git_branches{$branchname} = undef;
 		my $remote = remote_of_branch($branchname);
 		return unless defined $remote;
