@@ -23,6 +23,7 @@ my $do_fetch;
 my $geninfo_only;
 my $mergability_check;
 my $skip_update_check;
+my $find_obsolete_merges;
 
 GetOptions(
 	"branch|b" => \$make_branches,
@@ -32,6 +33,7 @@ GetOptions(
 	"outspec|o=s" => \$out_spec_filename,
 	"review|r" => \$do_review,
 	"skip-update-check" => \$skip_update_check,
+	"find-obsolete-merges" => \$find_obsolete_merges,
 ) or exit 1;
 
 my $specfn = shift;
@@ -678,6 +680,112 @@ sub do_all_fetching {
 }
 
 do_all_fetching() if $do_fetch;
+
+sub truncate_branch_name {
+	local $_ = shift;
+	s/\+knots$//;
+	s/-mini$//;
+	s/-(?:0\.)?\d+$//;
+	$_
+}
+
+sub do_find_obsolete_merges {
+	my $checkout_commit;
+	my @output;
+	my $out_warn = sub {
+		warn @_;
+		push @output, "@_";
+	};
+	my %seen_branches;
+	my %trunc_branches;
+	my %branches_with_issues;
+	for (@spec_lines) {
+		s/\s*#.*//;  # remove comments
+		if (my ($flags, $prnum, $rem) = (m/^([am]*)\t *($re_prnum)\s+(.*)$/)) {
+			$rem =~ m/^([^\s(]+)/ or next;
+			my ($branchname) = ($1);
+			die unless defined $checkout_commit;
+			$branchname = origin_pull_branchname($prnum) if $branchname eq '-';
+			my $log = gitcapture("log", "--merges", "--no-decorate", "--pretty=%s%n%P", "$checkout_commit..$branchname");
+			my $branchname_trunc = truncate_branch_name($branchname);
+			pos($log) = 0;
+			while (1) {
+				my $nlp = index($log, "\n", pos($log));
+				last if $nlp == -1;
+				my $subj = substr($log, pos($log), $nlp - pos($log));
+				my $nlp2 = index($log, "\n", $nlp + 1);
+				$nlp2 = length $log if $nlp2 == -1;
+				my @parents = split(/ /, substr($log, $nlp + 1, $nlp2 - $nlp - 1));
+				pos($log) = $nlp2 + 1;
+				
+				my $merged_branch;
+				if ($subj =~ /^Merge (?:remote-tracking )?branch '(.*?)' into /) {
+					$merged_branch = $1;
+				} elsif ($subj =~ /^Merge \S+ via (\S+)/) {
+					$merged_branch = $1;
+				} elsif ($subj =~ /^Merge (\S+)$/) {
+					$merged_branch = $1;
+				} elsif ($subj =~ /^Update .* subtree/) {
+					# TODO: Figure out if there's a way to check this
+					next
+				} elsif ($subj =~ /^Merge commit /) {
+					$out_warn->("Cannot check 'Merge commit'! $_");
+					next
+				} elsif ($subj =~ /^Merge bitcoin.*#\d+: /) {
+					$out_warn->("Upstream merge - probably poisoned! $_");
+					next
+				} else {
+					die "Merge subject match failed: $subj";
+				}
+				
+				my $new_merged_branch = $merged_branch;
+				my $merged_branch_desc = $merged_branch;
+				if (not exists $seen_branches{$merged_branch}) {
+					# Find new branch
+					my $merged_branch_trunc = truncate_branch_name($merged_branch);
+					if ($merged_branch_trunc eq $branchname_trunc) {
+						# Merging another version of itself, this is fine
+					} else {
+						my $seen = $trunc_branches{$merged_branch_trunc};
+						if (defined $seen) {
+							$new_merged_branch = $seen;
+							$merged_branch_desc .= " (now $new_merged_branch?)";
+						} else {
+							$out_warn->("$merged_branch not seen yet (at $_)");
+						}
+					}
+				}
+				if (exists $branches_with_issues{$new_merged_branch}) {
+					$out_warn->("$branchname merges $merged_branch_desc which has issues");
+					next
+				}
+				die if @parents != 2;
+				if (0 != gitmayfail("merge-base", "--is-ancestor", $parents[1], $new_merged_branch)) {
+					$out_warn->("$branchname has obsolete merge for $merged_branch_desc");
+				}
+			}
+			
+			$seen_branches{$branchname} = undef;
+			if ($branchname ne $branchname_trunc) {
+				$trunc_branches{$branchname_trunc} = $branchname;
+			}
+		} elsif (m/^checkout (.*)$/) {
+			$checkout_commit = gitcapture("rev-parse", $1);
+		}
+	}
+	
+	if (@output) {
+		warn "Results:\n";
+		warn "$_\n" for @output;
+	} else {
+		print "Results: All good!\n";
+	}
+}
+
+if ($find_obsolete_merges) {
+	do_find_obsolete_merges;
+	exit
+}
 
 sub geninfo {
 	for (@spec_lines) {
