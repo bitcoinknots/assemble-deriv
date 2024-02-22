@@ -701,6 +701,7 @@ sub do_find_obsolete_merges {
 	my %trunc_branches;
 	my %branches_with_issues;
 	for (@spec_lines) {
+		chomp;
 		s/\s*#.*//;  # remove comments
 		if (my ($flags, $prnum, $rem) = (m/^([am]*)\t *($re_prnum)\s+(.*)$/)) {
 			$rem =~ m/^([^\s(]+)/ or next;
