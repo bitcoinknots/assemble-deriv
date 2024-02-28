@@ -735,6 +735,7 @@ sub do_find_obsolete_merges {
 					next
 				} elsif ($subj =~ /^Merge bitcoin.*#\d+: /) {
 					$out_warn->("Upstream merge - probably poisoned! $_");
+					$branches_with_issues{$merged_branch} = undef;
 					next
 				} else {
 					die "Merge subject match failed: $subj";
@@ -759,11 +760,13 @@ sub do_find_obsolete_merges {
 				}
 				if (exists $branches_with_issues{$new_merged_branch}) {
 					$out_warn->("$branchname merges $merged_branch_desc which has issues");
+					$branches_with_issues{$new_merged_branch} = undef;
 					next
 				}
 				die if @parents != 2;
 				if (0 != gitmayfail("merge-base", "--is-ancestor", $parents[1], $new_merged_branch)) {
 					$out_warn->("$branchname has obsolete merge for $merged_branch_desc");
+					$branches_with_issues{$new_merged_branch} = undef;
 				}
 			}
 			
