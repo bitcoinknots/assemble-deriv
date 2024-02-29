@@ -697,6 +697,17 @@ sub do_find_obsolete_merges {
 		warn @_;
 		push @output, "@_";
 	};
+	my %is_ancestor_cache;
+	my $is_ancestor = sub {
+		my ($potential_parent, $child) = @_;
+		my $cache_key = "$potential_parent $child";
+		if (exists $is_ancestor_cache{$cache_key}) {
+			return $is_ancestor_cache{$cache_key}
+		}
+		my $r = (0 == gitmayfail("merge-base", "--is-ancestor", $potential_parent, $child));
+		$is_ancestor_cache{$cache_key} = $r;
+		$r
+	};
 	my %seen_branches;
 	my %trunc_branches;
 	my %branches_with_issues;
@@ -764,7 +775,7 @@ sub do_find_obsolete_merges {
 					next
 				}
 				die if @parents != 2;
-				if (0 != gitmayfail("merge-base", "--is-ancestor", $parents[1], $new_merged_branch)) {
+				if (!$is_ancestor->($parents[1], $new_merged_branch)) {
 					$out_warn->("$branchname has obsolete merge for $merged_branch_desc");
 					$branches_with_issues{$new_merged_branch} = undef;
 				}
