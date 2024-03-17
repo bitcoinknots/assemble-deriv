@@ -771,13 +771,15 @@ sub do_find_obsolete_merges {
 				}
 				if (exists $branches_with_issues{$new_merged_branch}) {
 					$out_warn->("$branchname merges $merged_branch_desc which has issues");
-					$branches_with_issues{$new_merged_branch} = undef;
+					$branches_with_issues{$branchname} = undef;
+					$branches_with_issues{$branchname_trunc} = undef;
 					next
 				}
 				die if @parents != 2;
 				if (!$is_ancestor->($parents[1], $new_merged_branch)) {
 					$out_warn->("$branchname has obsolete merge for $merged_branch_desc");
-					$branches_with_issues{$new_merged_branch} = undef;
+					$branches_with_issues{$branchname} = undef;
+					$branches_with_issues{$branchname_trunc} = undef;
 				}
 			}
 			
