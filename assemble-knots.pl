@@ -684,7 +684,7 @@ do_all_fetching() if $do_fetch;
 
 sub truncate_branch_name {
 	local $_ = shift;
-	s/\+knots$//;
+	s/\+k(?:nots)?$//;
 	s/-mini$//;
 	s/-(?:0\.)?\d+$//;
 	$_
