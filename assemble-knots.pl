@@ -991,6 +991,8 @@ while ($_ = shift @spec_lines) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
 		
+		die "Null-merge makes no sense with `lastapply no-merge`!" if $no_lastapply;
+		
 		my $revert_commit;
 		if (defined $lastapply) {
 			$lastapply = gitcapture("rev-parse", $lastapply);
