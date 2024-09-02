@@ -543,6 +543,7 @@ sub get_latest_upstream {
 		$latest_upstream = $upstream;
 		$latest_upstream_time = $upstream_time;
 	}
+	die "Latest upstream is undefined!" unless $latest_upstream;
 	$latest_upstream
 }
 
