@@ -471,14 +471,14 @@ sub patchversion {
 	my ($bno, $found);
 	while (my $fline = <$fin>) {
 		if ($bno) {
-			if ($fline =~ s/(\bss\s*\<\<\s*\")\w+\:\S+(\/\"\;)/$1$verstr$2/) {
+			if ($fline =~ s/(\b(?:ss\s*\<\<|ua\s*\+\=)\s*\")\w+\:\S+(\/\"\;)/$1$verstr$2/) {
 				warn "(replaced version string)";
 				undef $bno;
 				$found = 1;
 			}
-		} elsif ($fline =~ /\bif\s*\(\!fBaseNameOnly\)$/) {
+		} elsif ($fline =~ /\bif\s*\(\!(fBaseNameOnly|base_name_only)\)(?:\s*\{)?$/) {
 			$bno = 1;
-			warn "(found fBaseNameOnly check)";
+			warn "(found $1 check)";
 		}
 		print $fout $fline or die;
 	}
