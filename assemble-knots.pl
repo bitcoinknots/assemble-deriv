@@ -1182,6 +1182,9 @@ did_ff:
 		if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
 				die "CHECK-LAST failed for upstream $upstreambranch\n";
 		}
+	} elsif (m[^\s*PAUSE\s*$]) {
+		print "PAUSED - PRESS ENTER TO CONTINUE\n";
+		<>;
 	} else {
 		die "Unrecognised line: $_"
 	}
