@@ -723,6 +723,7 @@ sub do_find_obsolete_merges {
 			my $log = gitcapture("log", "--merges", "--no-decorate", "--pretty=%s%n%P", "$checkout_commit..$branchname");
 			my $branchname_trunc = truncate_branch_name($branchname);
 			pos($log) = 0;
+			my $reported_upstream_merge;
 			while (1) {
 				my $nlp = index($log, "\n", pos($log));
 				last if $nlp == -1;
@@ -746,7 +747,8 @@ sub do_find_obsolete_merges {
 					$out_warn->("Cannot check 'Merge commit'! $_");
 					next
 				} elsif ($subj =~ /^Merge bitcoin.*#\d+: /) {
-					$out_warn->("Upstream merge - probably poisoned! $_");
+					$out_warn->("Upstream merge - probably poisoned! $_") unless $reported_upstream_merge;
+					$reported_upstream_merge = 1;
 					$branches_with_issues{$merged_branch} = undef;
 					next
 				} else {
