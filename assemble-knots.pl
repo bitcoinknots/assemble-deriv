@@ -862,6 +862,7 @@ sub do_mergability_check {
 		} elsif (my ($flags, $prnum, $rem) = (m/^([am]*)\t *($re_prnum)\s+(.*)$/)) {
 			if ($rem =~ m/^(\S+)?(?:\s*\(C\:($hexd{7,})\))?()(?:\s+($hexd{7,}\b))?(?:\s+last\=($hexd{7,})(?:\s+(\!?$re_branch))?)?$/) {
 				my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
+				next if $prnum =~ m[^n\/a$|^-$] and not defined $upstreambranch;
 				my @upstream_candidates;
 				my $latest_upstream = get_latest_upstream($prnum, $upstreambranch, \@upstream_candidates);
 				if (any { $_ eq $branchname } @upstream_candidates or $branchname =~ /\//) {
