@@ -1085,10 +1085,10 @@ while ($_ = shift @spec_lines) {
 			}
 		}
 		
-		if ((not (defined $merge_more or defined $manual_conflict_patch)) and wc_l(gitcapture("log", "--no-decorate", "--pretty=%%", "$mainmerge..")) == 0) {
-			my $x = gitcapture("log", "--no-decorate", "--pretty=%P", "--first-parent", "..$mainmerge");
+		if (not (defined $merge_more or defined $manual_conflict_patch)) {
+			my $head_commit = gitcapture("rev-parse", "HEAD");
 			# Only fast-forward if we have a single merge commit on top of the current head
-			if (wc_l($x) == 1 and (split /\s+/, $x) > 1) {
+			if (gitcapture("show", "--no-decorate", "--no-patch", "--pretty=%P", $mainmerge) =~ m[^$head_commit\s]) {
 				git("merge", "--ff-only", "$mainmerge");
 				goto did_ff;
 			}
