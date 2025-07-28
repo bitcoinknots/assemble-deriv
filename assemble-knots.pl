@@ -478,7 +478,7 @@ sub patchfile {
 	1
 }
 
-sub patchversion {
+sub patchversion_knots13to28 {
 	my ($verstr) = @_;
 	my $verfile = "src/clientversion.cpp";
 	patchfile($verfile, sub {
@@ -494,6 +494,26 @@ sub patchversion {
 			} elsif ($fline =~ /\bif\s*\(\!(fBaseNameOnly|base_name_only)\)(?:\s*\{)?$/) {
 				$bno = 1;
 				warn "(found $1 check)";
+			}
+			print $fout $fline or die;
+		}
+		$found
+	}) or die "Failed to patch $verfile";
+}
+
+sub patchversion {
+	my ($verstr) = @_;
+	if ($verstr =~ /\:/) {
+		return patchversion_knots13to28(@_)
+	}
+	my $verfile = "CMakeLists.txt";
+	patchfile($verfile, sub {
+		my ($fin, $fout) = @_;
+		my $found;
+		while (my $fline = <$fin>) {
+			if ($fline =~ s/\b(set\(CLIENT_VERSION_SUFFIX ").*?"/$1.$verstr"/) {
+				warn "(replaced version string)";
+				$found = 1;
 			}
 			print $fout $fline or die;
 		}
