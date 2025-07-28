@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # kate: space-indent off;
 
-# Copyright 2016-2021 Luke Dashjr
+# Copyright 2016-2025 Luke Dashjr
 # Note this is presently NOT free software. See LICENSE for details.
 # Use at your own risk. No warranty.
 
@@ -462,33 +462,43 @@ sub gitcherrypick {
 	git("cherry-pick", @cherrypick_opt, "--no-commit", $cherry);
 }
 
-sub patchversion {
-	my ($verstr) = @_;
-	my $verfile = "src/clientversion.cpp";
-	my $tempfile = "src/clientversion.cpp.new";
-	open my $fin, "<", $verfile or die "Cannot open $verfile";
+sub patchfile {
+	my ($fn, $func) = @_;
+	my $tempfile = $fn . ".new";
+	open my $fin, "<", $fn or die "Cannot open $fn";
 	open my $fout, ">", $tempfile or die "Cannot open $tempfile";
-	my ($bno, $found);
-	while (my $fline = <$fin>) {
-		if ($bno) {
-			if ($fline =~ s/(\b(?:ss\s*\<\<|ua\s*\+\=)\s*\")\w+\:\S+(\/\"\;)/$1$verstr$2/) {
-				warn "(replaced version string)";
-				undef $bno;
-				$found = 1;
-			}
-		} elsif ($fline =~ /\bif\s*\(\!(fBaseNameOnly|base_name_only)\)(?:\s*\{)?$/) {
-			$bno = 1;
-			warn "(found $1 check)";
-		}
-		print $fout $fline or die;
-	}
-	close $fout;
+	my $found = $func->($fin, $fout);
+	close $fout or die "Failed to close $tempfile";
 	close $fin;
 	if (not $found) {
 		unlink($tempfile);
-		die "Failed to patch $verfile";
+		return 0;
 	}
-	rename($tempfile, $verfile) or die;
+	rename($tempfile, $fn) or die;
+	1
+}
+
+sub patchversion {
+	my ($verstr) = @_;
+	my $verfile = "src/clientversion.cpp";
+	patchfile($verfile, sub {
+		my ($fin, $fout) = @_;
+		my ($bno, $found);
+		while (my $fline = <$fin>) {
+			if ($bno) {
+				if ($fline =~ s/(\b(?:ss\s*\<\<|ua\s*\+\=)\s*\")\w+\:\S+(\/\"\;)/$1$verstr$2/) {
+					warn "(replaced version string)";
+					undef $bno;
+					$found = 1;
+				}
+			} elsif ($fline =~ /\bif\s*\(\!(fBaseNameOnly|base_name_only)\)(?:\s*\{)?$/) {
+				$bno = 1;
+				warn "(found $1 check)";
+			}
+			print $fout $fline or die;
+		}
+		$found
+	}) or die "Failed to patch $verfile";
 }
 
 sub commitmsg {
