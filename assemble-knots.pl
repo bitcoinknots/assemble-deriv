@@ -932,6 +932,9 @@ if (defined $mergability_check) {
 
 my $last_rnf_delete;
 
+$ENV{GIT_COMMITTER_NAME} = "merge-script";
+$ENV{GIT_AUTHOR_NAME} = $ENV{GIT_COMMITTER_NAME};
+
 while ($_ = shift @spec_lines) {
 	my $line = $_;
 	s/\s*#.*//;  # remove comments
