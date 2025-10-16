@@ -17,6 +17,9 @@ use List::Util qw(any);
 
 my $expect_to_rebase = 1;
 
+# Your local pointer to the master branch at Bitcoin Core
+my $bitcoin_core_master_branch;
+
 my $make_branches;
 my $out_spec_filename;
 my $do_review;
@@ -27,6 +30,7 @@ my $skip_update_check;
 my $find_obsolete_merges;
 
 GetOptions(
+	"bitcoin-core-master-branch=s" => \$bitcoin_core_master_branch,
 	"branch|b" => \$make_branches,
 	"fetch|f" => \$do_fetch,
 	"geninfo" => \$geninfo_only,
@@ -39,6 +43,10 @@ GetOptions(
 
 my $specfn = shift;
 die "Too many arguments" if shift;
+
+if (not defined $bitcoin_core_master_branch) {
+	$bitcoin_core_master_branch = "master";
+};
 
 my $hexd = qr/[\da-f]/i;
 my $re_prnum = qr/[a-z]?\d+|\-|n\/a/;
@@ -649,7 +657,7 @@ sub handle_checkout {
 	git "checkout", $branchhead;
 	
 	@poison = ();
-	my $poisoncommit = gitcapture("log", "--no-decorate", "..master", "--first-parent", "--reverse", "--format=%H");
+	my $poisoncommit = gitcapture("log", "--no-decorate", "..$bitcoin_core_master_branch", "--first-parent", "--reverse", "--format=%H");
 	if ($poisoncommit) {
 		$poisoncommit =~ s/\n.*//s;
 		push @poison, $poisoncommit;
