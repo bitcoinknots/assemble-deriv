@@ -957,6 +957,8 @@ my $last_rnf_delete;
 
 $ENV{GIT_COMMITTER_NAME} = "merge-script";
 $ENV{GIT_AUTHOR_NAME} = $ENV{GIT_COMMITTER_NAME};
+$ENV{GIT_COMMITTER_EMAIL} = "merges@bitcoinknots.org";
+$ENV{GIT_AUTHOR_EMAIL} = $ENV{GIT_COMMITTER_EMAIL};
 
 while ($_ = shift @spec_lines) {
 	my $line = $_;
