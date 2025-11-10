@@ -17,6 +17,9 @@ use List::Util qw(any);
 
 my $expect_to_rebase = 1;
 
+# Your local pointer to the master branch at Bitcoin Core
+my $upstream_master_branch;
+
 my $make_branches;
 my $out_spec_filename;
 my $do_review;
@@ -24,9 +27,14 @@ my $do_fetch;
 my $geninfo_only;
 my $mergability_check;
 my $skip_update_check;
+
+# if upstream branches in the spec are deleted in their remotes, skip update checks on those
+my $ignore_missing_upstreams;
+
 my $find_obsolete_merges;
 
 GetOptions(
+	"upstream-master-branch=s" => \$upstream_master_branch,
 	"branch|b" => \$make_branches,
 	"fetch|f" => \$do_fetch,
 	"geninfo" => \$geninfo_only,
@@ -34,11 +42,16 @@ GetOptions(
 	"outspec|o=s" => \$out_spec_filename,
 	"review|r" => \$do_review,
 	"skip-update-check" => \$skip_update_check,
+	"ignore-missing-upstreams" => \$ignore_missing_upstreams,
 	"find-obsolete-merges" => \$find_obsolete_merges,
 ) or exit 1;
 
 my $specfn = shift;
 die "Too many arguments" if shift;
+
+if (not defined $upstream_master_branch) {
+	$upstream_master_branch = "master";
+};
 
 my $hexd = qr/[\da-f]/i;
 my $re_prnum = qr/[a-z]?\d+|\-|n\/a/;
@@ -183,7 +196,7 @@ sub is_poisoned {
 
 my @mergability_check_poison;
 if (defined $mergability_check) {
-	my $poisoncommit = gitcapture("log", "--no-decorate", "$mergability_check..master", "--first-parent", "--reverse", "--format=%H");
+	my $poisoncommit = gitcapture("log", "--no-decorate", "$mergability_check..$upstream_master_branch", "--first-parent", "--reverse", "--format=%H");
 	die unless $poisoncommit;
 	$poisoncommit =~ s/\n.*//s;
 	push @mergability_check_poison, $poisoncommit;
@@ -549,19 +562,28 @@ sub fetchforbranch {
 	}
 }
 
-sub get_latest_upstream {
+sub get_latest_upstream_branch {
 	my ($prnum, $upstreambranch, $upstream_candidates) = @_;
+
+	# get upstream_candidates:
 	my $include_pr_upstream = 1;
 	if (defined $upstreambranch) {
 		if ($upstreambranch =~ s/^\!//) {
 			# ONLY this upstream
 			undef $include_pr_upstream;
 		}
-		push @$upstream_candidates, $upstreambranch;
+	
+		# check if branch upstream_branch is accessible via remote
+		my $get_upstream_ec = gitmayfail("rev-parse", $upstreambranch);
+		if (not $get_upstream_ec) {
+			push @$upstream_candidates, $upstreambranch;
+		}
 	}
+
 	if ($include_pr_upstream) {
 		push @$upstream_candidates, origin_pull_branchname($prnum);
 	}
+
 	my ($latest_upstream, $latest_upstream_time);
 	for my $upstream (@$upstream_candidates) {
 		next unless defined $upstream;
@@ -573,7 +595,8 @@ sub get_latest_upstream {
 		$latest_upstream = $upstream;
 		$latest_upstream_time = $upstream_time;
 	}
-	die "Latest upstream is undefined!" unless $latest_upstream;
+
+	# can be undefined, if no upstreams present
 	$latest_upstream
 }
 
@@ -649,7 +672,7 @@ sub handle_checkout {
 	git "checkout", $branchhead;
 	
 	@poison = ();
-	my $poisoncommit = gitcapture("log", "--no-decorate", "..master", "--first-parent", "--reverse", "--format=%H");
+	my $poisoncommit = gitcapture("log", "--no-decorate", "..$upstream_master_branch", "--first-parent", "--reverse", "--format=%H");
 	if ($poisoncommit) {
 		$poisoncommit =~ s/\n.*//s;
 		push @poison, $poisoncommit;
@@ -894,7 +917,7 @@ sub do_mergability_check {
 				my ($branchname, $manual_conflict_patch, $pre_lastapply, $lastapply, $lastupstream, $upstreambranch) = ($1, $2, $3, $4, $5, $6);
 				next if $prnum =~ m[^n\/a$|^-$] and not defined $upstreambranch;
 				my @upstream_candidates;
-				my $latest_upstream = get_latest_upstream($prnum, $upstreambranch, \@upstream_candidates);
+				my $latest_upstream = get_latest_upstream_branch($prnum, $upstreambranch, \@upstream_candidates);
 				if (any { $_ eq $branchname } @upstream_candidates or $branchname =~ /\//) {
 					# We're using an upstream branch already - just be sure it's the latest
 					if (gitcapture("rev-parse", $branchname) eq gitcapture("rev-parse", $latest_upstream)) {
@@ -934,6 +957,8 @@ my $last_rnf_delete;
 
 $ENV{GIT_COMMITTER_NAME} = "merge-script";
 $ENV{GIT_AUTHOR_NAME} = $ENV{GIT_COMMITTER_NAME};
+$ENV{GIT_COMMITTER_EMAIL} = "merges@bitcoinknots.org";
+$ENV{GIT_AUTHOR_EMAIL} = $ENV{GIT_COMMITTER_EMAIL};
 
 while ($_ = shift @spec_lines) {
 	my $line = $_;
@@ -1096,11 +1121,18 @@ did_ff_nm:
 		fetchforbranch $branchname;
 		my @upstream_candidates;
 		if ((not $skip_update_check) and defined $lastupstream) {
-			my $latest_upstream = get_latest_upstream($prnum, $upstreambranch, \@upstream_candidates);
-			$upstreambranch = $latest_upstream;
-			fetchforbranch $upstreambranch;
-			if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
-				die "$prnum $branchname needs updates from upstream $upstreambranch\n";
+			my $latest_upstream = get_latest_upstream_branch($prnum, $upstreambranch, \@upstream_candidates);
+		
+			if (defined $latest_upstream) {
+				$upstreambranch = $latest_upstream;
+				fetchforbranch $upstreambranch;
+				if (gitcapture("rev-parse", $lastupstream) ne gitcapture("rev-parse", $upstreambranch)) {
+					die "$prnum $branchname needs updates from upstream $upstreambranch\n";
+				}
+			} else {
+				if (not $ignore_missing_upstreams) {
+					die "None of the upstream branches provided are accessible";
+				}
 			}
 		}
 		my $branchparent = $branchname;
