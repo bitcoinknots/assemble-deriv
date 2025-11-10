@@ -1030,6 +1030,13 @@ while ($_ = shift @spec_lines) {
 		
 		die "Null-merge makes no sense with `lastapply no-merge`!" if $no_lastapply;
 		
+		my $head_commit = gitcapture("rev-parse", "HEAD");
+		# Only fast-forward if lastapply was a null-merge itself
+		if (gitcapture("show", "--no-decorate", "--no-patch", "--pretty=%P", $lastapply) =~ m[^$head_commit\s] and 0 == length gitcapture("diff", "$head_commit..$lastapply")) {
+			git("merge", "--ff-only", $lastapply);
+			goto did_ff_nm;
+		}
+		
 		my $revert_commit;
 		if (defined $lastapply) {
 			$lastapply = gitcapture("rev-parse", $lastapply);
@@ -1059,6 +1066,8 @@ while ($_ = shift @spec_lines) {
 		git("checkout", "-q", $chash);
 		
 		replace_lastapply(\$line, @lastapply_pos, gitcapture("rev-parse", "--short", "HEAD"));
+did_ff_nm:
+		;
 	} elsif (my ($prnum, $branchname, $lastapply) = (m/^TM\t *($re_prnum)\s+(\S+)\s+($hexd{7,})(?:\s+last\=$hexd{7,}(?:\s+(\!?$re_branch))?)?$/)) {
 		my @lastapply_pos = (defined $lastapply) ? ($-[3], $+[3]) : ($+[2], -1);
 		ensure_ready;
