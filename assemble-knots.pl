@@ -285,7 +285,7 @@ sub smartconflicthealer {
 				$thistype = "filelist[$1,$4]";
 			} elsif ($line =~ /^(\s*)\<file alias\=\"(\S+?)\"\>(\S+?)\<\/file\>(\s*\\?)$/) {
 				$thistype = "xmlfilelist[$1,$4]";
-			} elsif ($line =~ /^\#include ([<"]).*[>"]$/) {
+			} elsif ($line =~ /^\#include ([<"]).*[>"](?:\s+\/\/\s.*)?$/) {
 				$thistype = "include[$1]";
 			} elsif ($line =~ /^\s*$/) {
 				# Safe to ignore blank lines usually
