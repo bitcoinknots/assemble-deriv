@@ -105,7 +105,7 @@ sub git {
 sub syscapture {
 	my @cmd = @_;
 	print STDERR "@cmd\n";
-	open(my $outio, "-|", @cmd);
+	open(my $outio, "-|", @cmd) or die "Failed to run @cmd: $!";
 	my $out;
 	{
 		local $/;
@@ -395,7 +395,7 @@ retry:
 	
 	my $resfile = "$resbase.res";
 	if (-e $resfile) {
-		open(my $resfh, "<", $resfile);
+		open(my $resfh, "<", $resfile) or die "Cannot open $resfile: $!";
 		my $res = <$resfh>;
 		close $resfh;
 		$used_autoresolvers{$resfile} = undef;
@@ -636,9 +636,9 @@ sub ready_to_review {
 my $out_spec;
 if ($out_spec_filename) {
 	die if -e $out_spec_filename;
-	open $out_spec, ">", $out_spec_filename;
+	open $out_spec, ">", $out_spec_filename or die "Cannot open $out_spec_filename: $!";
 } else {
-	open $out_spec, ">", "/dev/null";
+	open $out_spec, ">", "/dev/null" or die "Cannot open /dev/null: $!";
 }
 
 my $branchhead;
@@ -662,7 +662,7 @@ sub handle_checkout {
 	delete $todo{checkout};
 }
 
-open(my $spec, '<', $specfn);
+open(my $spec, '<', $specfn) or die "Cannot open $specfn: $!";
 my @spec_lines = <$spec>;
 
 sub do_all_fetching {
@@ -881,7 +881,7 @@ sub is_clean_merge {
 }
 
 sub do_mergability_check {
-	open(my $mergability_out_fh, ">&", 3);
+	open(my $mergability_out_fh, ">&", 3) or die "Cannot open fd 3: $!";
 	my $checkout_ref;
 	for (@spec_lines) {
 		my $specline = $_;
@@ -975,9 +975,9 @@ while ($_ = shift @spec_lines) {
 				die "Skipping a parent in rebase! Aborting"
 			}
 			$lastapply = gitcapture("rev-parse", $lastapply);
-			open my $MERGE_HEAD, ">", "$git_dir/MERGE_HEAD";
-			print $MERGE_HEAD $lastapply;
-			close $MERGE_HEAD;
+			open my $MERGE_HEAD, ">", "$git_dir/MERGE_HEAD" or die "Cannot write $git_dir/MERGE_HEAD: $!";
+			print $MERGE_HEAD $lastapply or die "Failed to write MERGE_HEAD: $!";
+			close $MERGE_HEAD or die "Failed to close MERGE_HEAD: $!";
 		} elsif (not @rnf_to_delete) {
 			replace_lastapply(\$line, @lastapply_pos, undef);
 			goto next_in_line
@@ -1015,9 +1015,9 @@ while ($_ = shift @spec_lines) {
 				die "Skipping a parent in rebase! Aborting"
 			}
 			$lastapply = gitcapture("rev-parse", $lastapply);
-			open my $MERGE_HEAD, ">", "$git_dir/MERGE_HEAD";
-			print $MERGE_HEAD $lastapply;
-			close $MERGE_HEAD;
+			open my $MERGE_HEAD, ">", "$git_dir/MERGE_HEAD" or die "Cannot write $git_dir/MERGE_HEAD: $!";
+			print $MERGE_HEAD $lastapply or die "Failed to write MERGE_HEAD: $!";
+			close $MERGE_HEAD or die "Failed to close MERGE_HEAD: $!";
 		}
 		
 		git("commit", "-aC", $cherry);
@@ -1049,9 +1049,9 @@ while ($_ = shift @spec_lines) {
 				$revert_commit = gitcapture("rev-parse", "HEAD");
 				git("checkout", "-q", $current_head_commit);
 				{
-					open my $fh, ">", "$git_dir/HEAD";
-					print $fh $current_head_ref;
-					close $fh;
+					open my $fh, ">", "$git_dir/HEAD" or die "Cannot write $git_dir/HEAD: $!";
+					print $fh $current_head_ref or die "Failed to write HEAD: $!";
+					close $fh or die "Failed to close HEAD: $!";
 				}
 			} else {
 				# Must have been reverted in previous branch already
