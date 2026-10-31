@@ -1110,6 +1110,12 @@ did_ff_nm:
 			die "Branch $branchname is poisoned";
 		}
 		
+		{
+			# A branch built on someone else's assembly would bring a second copy of it in
+			my @foreign = grep { m/^\S+ (?:(?:Tree-|NULL-)?Merge \S+(?: via \S+)?|Bump version to \S+|Delete release notes fragments)$/ } split /\n/, gitcapture("log", "--no-decorate", "--committer=^merge-script <", "--pretty=%h %s", $branchname, "--not", "HEAD", (defined $lastapply) ? ($lastapply) : ());
+			die "Branch $branchname includes assembled commits that are not in this assembly:\n" . join("\n", @foreign) . "\n" if @foreign;
+		}
+		
 		my ($merge_lastapply, $merge_more);
 		if ((defined $lastapply) and not $no_lastapply) {
 			$merge_lastapply = (wc_l(gitcapture("log", "--no-decorate", "--first-parent", "--pretty=%%", "..$lastapply")) == 1);
